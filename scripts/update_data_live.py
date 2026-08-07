@@ -47,15 +47,15 @@ def _fls(container):
     """The fl-levels ('fl1'/'fl2') actually present in a team/epic-card container."""
     return [fl for fl in ('fl1', 'fl2') if fl in container]
 
-def _fetch(conn_id):
+def _fetch(conn_id, data_path='data-machine.json'):
     r = call_tool('github_get_file_contents', {
-        'connectionId': conn_id, 'owner': OWNER, 'repo': REPO, 'path': 'data-machine.json'})
+        'connectionId': conn_id, 'owner': OWNER, 'repo': REPO, 'path': data_path})
     data = json.loads(base64.b64decode(r['content'].replace('\n', '')).decode())
     return r['sha'], data
 
-def month_present(conn_id, realm_id, month_str):
+def month_present(conn_id, realm_id, month_str, data_path='data-machine.json'):
     """Cheap idempotency pre-check: True if month_str is already recorded for realm_id."""
-    _, data = _fetch(conn_id)
+    _, data = _fetch(conn_id, data_path)
     realm = data['realms'].get(realm_id)
     return bool(realm and month_str in realm['months'])
 
@@ -68,20 +68,20 @@ def _snapshot_container_last(container):
             out[fl][k] = arr[-1] if isinstance(arr, list) and arr else None
     return out
 
-def latest_values(conn_id, realm_id):
+def latest_values(conn_id, realm_id, data_path='data-machine.json'):
     """Most recent month's TEAM values as {tid: {fl: {...}}} (present fl-levels only).
     Returns None if the realm has no data yet. Backward-compatible for Core/Apps
     (teams have fl1+fl2) and correct for Machine (teams have fl1 only)."""
-    _, data = _fetch(conn_id)
+    _, data = _fetch(conn_id, data_path)
     realm = data['realms'].get(realm_id)
     if not realm or not realm.get('months'):
         return None
     return {tid: _snapshot_container_last(t) for tid, t in realm['teams'].items()}
 
-def latest_cards(conn_id, realm_id):
+def latest_cards(conn_id, realm_id, data_path='data-machine.json'):
     """Most recent month's EPIC-CARD values as {cid: {'fl2': {...}}} for split realms
     (Machine). Returns None if the realm has no epic_cards or no data yet."""
-    _, data = _fetch(conn_id)
+    _, data = _fetch(conn_id, data_path)
     realm = data['realms'].get(realm_id)
     if not realm or not realm.get('months') or not realm.get('epic_cards'):
         return None
@@ -111,14 +111,15 @@ def _check_lengths(realm_id, kind, mapping, n_months):
                         f"Safety check failed: {realm_id}.{kind}.{cid}.{fl}.{key} has length "
                         f"{len(arr)} but months has length {n_months}. Aborting write.")
 
-def update(conn_id, realm_id, month_str, team_values, card_values=None, commit_prefix="Data"):
+def update(conn_id, realm_id, month_str, team_values, card_values=None, commit_prefix="Data",
+           data_path='data-machine.json'):
     """
     Returns {"status": "updated"|"duplicate", "index": int, "months": [...]}.
     Raises UpdateAborted if a safety check fails — caller MUST surface it and must NOT
     retry blindly. card_values is only used for split realms that have realm["epic_cards"].
     """
     # 1. Fresh fetch right before writing
-    sha, data = _fetch(conn_id)
+    sha, data = _fetch(conn_id, data_path)
 
     if realm_id not in data['realms']:
         raise UpdateAborted(f"Unknown realm_id '{realm_id}' — not present in data.json realms.")
@@ -171,7 +172,7 @@ def update(conn_id, realm_id, month_str, team_values, card_values=None, commit_p
     content = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
     call_tool('github_create_or_update_file', {
         'connectionId': conn_id, 'owner': OWNER, 'repo': REPO,
-        'path': 'data-machine.json',
+        'path': data_path,
         'message': f'{commit_prefix} {realm_id}: {month_str}',
         'content': content,
         'sha': sha,
