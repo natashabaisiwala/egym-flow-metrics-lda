@@ -1,7 +1,14 @@
 """
-EGYM Flow Metrics — Multi-Realm Dashboard Generator (v6)  [reusable]
+EGYM Flow Metrics — Multi-Realm Dashboard Generator (v7)  [reusable]
 Fully data-driven. Supports any number of realms and teams.
 Structure: /{realm_id}/{team_slug}.html + /{realm_id}/index.html + /index.html
+
+OWNERSHIP NOTE (v7): run() no longer writes index.html, global-dashboard.html,
+or upload.html. Those 3 shared cross-realm pages are owned exclusively by the
+Space agent (via scripts/update_shared_pages.py, which imports this module's
+main_index_html()/global_dashboard_html()/upload_page_html() directly). Any
+realm agent calling run() — directly or via machine_publish.py/update_data_live.py
+— only ever touches its own realm's team pages, realm-dashboard, and realm index.
 """
 import json, base64, re
 from agent_tools import call_tool
@@ -1153,11 +1160,16 @@ a{{color:#60a5fa}}
 <footer>Auto-generated · Nave + Jira via Notion · {end}</footer>
 </body></html>"""
 
-# ─── Main ──────────────────────────────────────────────────────────────────────
+# ─── Main (realm-scoped only — the 3 shared pages are the Space agent's job) ───
 def run(gh_conn, realm_ids=None):
     """
     gh_conn    — GitHub connection ID
     realm_ids  — list of realm IDs to update, e.g. ['apps']. None = all realms with data.
+
+    Builds/pushes ONLY the given realm(s)' own files: team dashboards,
+    realm-dashboard.html, and realm index.html. Never touches the repo-root
+    index.html, global-dashboard.html, or upload.html — those 3 shared pages
+    are rebuilt exclusively by the Space agent (scripts/update_shared_pages.py).
     """
     global GH_CONN
     GH_CONN = gh_conn
@@ -1209,22 +1221,7 @@ def run(gh_conn, realm_ids=None):
              f"Update {r['name']} index ({months[-1]})", shas.get(idx_path))
         print(f"  ✅ {idx_path}")
 
-    # Main index (always regenerate)
-    push('index.html', main_index_html(data),
-         f"Update main index", shas.get('index.html'))
-    print("\n✅ index.html updated")
-
-    # Global Engineering View (always regenerate — depends on all realms)
-    push('global-dashboard.html', global_dashboard_html(data),
-         f"Update global engineering view", shas.get('global-dashboard.html'))
-    print("✅ global-dashboard.html updated")
-
-    # Upload page (always regenerate — static, but keep in sync with webhook URL)
-    push('upload.html', upload_page_html(),
-         f"Update upload page", shas.get('upload.html'))
-    print("✅ upload.html updated")
-
-    print("Done!")
+    print("Done! (index.html / global-dashboard.html / upload.html are owned by the Space agent — not touched here.)")
     return True
 
 if __name__ == '__main__':
