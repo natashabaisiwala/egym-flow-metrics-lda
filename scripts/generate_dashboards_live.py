@@ -1141,6 +1141,7 @@ h1{{font-size:1.5rem;font-weight:800;letter-spacing:-.03em}}
 .kpi{{background:#141828;border:1px solid #252c45;border-top:3px solid #60a5fa;border-radius:10px;padding:12px 14px}}
 .kpi .lbl{{font-size:.63rem;color:#7a87a0;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}}
 .kpi .val{{font-size:1.05rem;font-weight:700;display:flex;align-items:center;flex-wrap:wrap}}
+h2{{font-size:.95rem;font-weight:700;padding-left:10px;border-left:3px solid #60a5fa;margin:24px 0 12px}}
 .realm-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}}
 footer{{margin-top:28px;padding-top:14px;border-top:1px solid #1e2540;font-size:.7rem;color:#4a5568;text-align:center}}
 a{{color:#60a5fa}}
