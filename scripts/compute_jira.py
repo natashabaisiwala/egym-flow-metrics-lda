@@ -122,6 +122,21 @@ APPS_TEAMS = {
     "workout": "XT",
 }
 
+# --- Wellpass realm team mapping (8 teams; confirmed real Wellpass delivery teams
+# by Alexa Bobina, 2026-08-08). Brand-new realm, engine-first from day one — no
+# manual-seed period, no historical numbers to reconcile against. All 8 are plain
+# project scopes (worked_only=False, done_extra=None), standard fl1+fl2 schema.
+WELLPASS_TEAMS = {
+    "cgr": "WPCGR",   # WP Company Growth
+    "acq": "WPACQ",   # WP Offer & Acquisition
+    "aex": "WPAEX",   # WP Access Experience
+    "dis": "WPDIS",   # WP Discovery
+    "pex": "WPPEX",   # WP Partner Experience
+    "int": "WPINT",   # WP Partner Integrations
+    "mot": "WPMOT",   # WP Motivation
+    "act": "WPACT",   # WP Activation
+}
+
 def _normalize_cfg(val):
     """Normalize a team scope (plain project string or rich dict) to a standard cfg
     with fields: status_project, fl1, fl2, bugs (base JQL clauses)."""
