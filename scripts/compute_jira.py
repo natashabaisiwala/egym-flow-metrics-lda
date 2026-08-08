@@ -189,6 +189,8 @@ FL2_EXCLUDE = {
     "GXY-4966",   # Tech Improvements and Maintenance 2021-2025 (created 2021)
     "GXY-7159",   # Galaxy Deprecation Research and Implementation Phase 1 (created 2024-06)
     "GXY-7928",   # Speed up UPDS search per gym II (created 2024-09)
+    "CONN-885",   # OneMMS maintenance (created 2020-04, evergreen/umbrella; confirmed by Alexa Bobina 2026-08-08)
+    "CONN-1389",  # OneMMS v2 backlog (created 2022-01, evergreen/umbrella; confirmed by Alexa Bobina 2026-08-08)
 }
 
 MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
