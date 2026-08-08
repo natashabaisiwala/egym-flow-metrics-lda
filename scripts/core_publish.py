@@ -71,7 +71,10 @@ CORRECTIONS = (
     "Core-Workouts (cw) and Operator Experience (ox). Users & Locations (ul), Data "
     "Science (ds), and API Platform (mm) already matched with bugs included, so no "
     "change for them. Evergreen/umbrella epics are excluded from FL2 delivered/"
-    "cycle-time counts."
+    "cycle-time counts. Starting the Aug 2026 report, two long-open API Platform "
+    "(mm) epics -- CONN-885 (\"OneMMS maintenance\") and CONN-1389 (\"OneMMS v2 "
+    "backlog\") -- were confirmed as evergreen/umbrella work and excluded on the "
+    "same basis; historical months are unaffected."
 )
 
 
