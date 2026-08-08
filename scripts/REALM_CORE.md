@@ -65,6 +65,28 @@ FL1-team/FL2-card schema).
   here would need a matching re-seed — flag it to Alexa rather than doing it
   unilaterally.
 
+## Anomaly resolution procedure (standing rule — applies to any evergreen-epic-style outlier)
+When a soft anomaly is flagged (large month-over-month FL2 swing), first determine WHICH
+kind of anomaly it is before asking Alexa:
+1. **Traceable to one or a few specific delivered epics** (not a broad dataset switch):
+   look up the exact epic keys in Jira (created date, resolved date, summary). If they
+   look like evergreen/umbrella/maintenance-type epics (very old creation date, generic
+   "maintenance"/"backlog"-style summary, no bounded delivery scope) rather than real
+   time-boxed work, present the specific keys + dates + your assessment to Alexa and
+   offer two options: (a) legitimate value, force-publish as-is with a one-time
+   Corrections callout, or (b) add the EXACT key(s) to a `FL2_EXCLUDE`-style list in
+   `compute_jira.py` for that team. Option (b) is a methodology change — requires
+   Alexa's explicit sign-off on the specific key(s), and should be applied consistently
+   in BOTH the live repo and this LDA repo for that same team going forward. **Never**
+   infer or apply an automatic age/title heuristic yourself — only exact, human-approved
+   keys ever go into an exclusion list.
+2. **Traceable to a broad, whole-dataset discontinuity** (e.g. a manual-seed-to-engine
+   source switch, like the Jun→Jul boundary described above): do NOT propose exclusion.
+   Use the Option-B pattern instead — publish as-is with a one-time Corrections note
+   about the source switch.
+Never self-decide between these paths or silently force-publish through an anomaly —
+always surface the specific finding and let Alexa choose.
+
 ## Own orchestrator: `core_publish.py` (reusable, mock-tested)
 Direct single-shot analogue of the live repo's `monthly_run.py` Core path (Core is
 light — 5 teams, no batching needed, unlike Machine's `machine_monthly.py`/
