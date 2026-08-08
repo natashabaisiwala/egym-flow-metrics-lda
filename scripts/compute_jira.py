@@ -123,8 +123,14 @@ APPS_TEAMS = {
 }
 
 # --- Wellpass realm team mapping (8 teams; confirmed real Wellpass delivery teams
-# by Alexa Bobina, 2026-08-08). Brand-new realm, engine-first from day one — no
-# manual-seed period, no historical numbers to reconcile against. All 8 are plain
+# by Alexa Bobina, 2026-08-08). NOT brand-new: 13 months of Nave-verified history
+# (May 25-Jun 26) were seeded into the old egym-flow-metrics-live repo on
+# 2026-07-19 but never wired to any automation there, so Wellpass sat frozen at
+# Jun 26 with no ongoing engine computation. That history was migrated into this
+# realm's data-wellpass.json (schema-converted, deprecated wipAge/tpYTD fields
+# dropped, old team keys remapped 1:1) — see scripts/REALM_WELLPASS.md for the
+# full provenance. This agent's first live-computed month is the true
+# manual-seed-to-engine boundary for Wellpass. All 8 teams are plain
 # project scopes (worked_only=False, done_extra=None), standard fl1+fl2 schema.
 WELLPASS_TEAMS = {
     "cgr": "WPCGR",   # WP Company Growth
