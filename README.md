@@ -61,7 +61,7 @@ onboarding realm #2.
 | Machine  | in progress | ✅ Jul 2026 (from live repo) | first realm being onboarded |
 | Core     | not started | — | |
 | Apps     | not started | — | |
-| Wellpass | not started | — | next after Machine, per Alexa's plan |
+| Wellpass | in progress | ✅ 13 months (migrated from egym-flow-metrics-live, Aug 2026) | data + engine changes live; wellpass_publish.py + first live-computed month pending |
 | Space agent | not started | — | build when realm #2 starts |
 
 ## scripts/ contents (Machine, reused from egym-flow-metrics-live)
