@@ -244,7 +244,7 @@ def deliver(slack_conn, today, pdf_path, anchor_override=None, cadence_override=
            f"\U0001F4C4 PDF attached \u00b7 \U0001F4C8 Live dashboard: <{DASH}|Apps Realm dashboard>\n\n"
            f"{tags} \u2014 please review. If everything looks good, please share onward with your "
            f"Head of Realm both \u2013 the PDF and the link to the dashboard. If anything looks off, "
-           f"please reach out to <https://app.dataleap.ai/agents/a_s8o3bolv3bko6d01zkce|the Agent>.\n\n"
+           f"please reach out to <https://app.dataleap.ai/agents/a_iqusij6fsuyn3a32wzs6|the Agent>.\n\n"
            f"_Automatically generated \u00b7 rolling 120-day window (through {report_date})_")
     call_tool("slack_post_message", {
         "connectionId": slack_conn, "channelId": CHANNEL, "message": msg,
