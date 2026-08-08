@@ -1,3 +1,39 @@
+# -*- coding: utf-8 -*-
+"""
+EGYM Flow Metrics — CORE realm publish/report/deliver (LDA space)  [reusable]
+==============================================================================
+Core realm equivalent of machine_publish.py. Core does NOT need Machine's
+MAP/staging complexity: Core's Jira-engine output (compute_jira.compute_team_values
+with CORE_TEAMS) already matches update_data_live.py's "standard realm" schema 1:1
+(realm["teams"][tid] = {fl1:{...}, fl2:{...}}), so this script is a direct,
+single-shot analogue of the live repo's monthly_run.py Core path — same engine,
+same CORE_TEAMS (ul/cw/ox/ds/mm), same cadence day 20 (rolled to next business
+day), same rolling 120-day window, same validation/anomaly gates. It is adapted
+only for the LDA repo's independent data-core.json (via update_data_live.py's
+data_path param) and independent core/ dashboard pages (via
+generate_dashboards_live.py's data_path param), so Core can run fully
+independently of the Machine realm's data-machine.json.
+
+No engine/methodology changes. No changes to data.json/data-machine.json.
+
+USAGE (run in sequence on the Core cadence day):
+  # 1. compute + append + push data-core.json + regenerate core/ dashboards
+  #    (idempotent: skips the recompute+push if the month is already live)
+  uv run --with numpy,tzdata python core_publish.py <jira> <gh> <YYYY-MM-DD> --publish \
+      [--force-anomalies]
+  # 2. build the report PDF (pass the agent-authored notes file)
+  uv run --with numpy,tzdata,reportlab python core_publish.py <jira> <gh> <YYYY-MM-DD> \
+      --report --notes=notes_core.json --out=/agent/home/Core_Realm_flow_metrics_YYYY_MM.pdf
+  # 3. post to the LDA channel (only after Alexa approves the DM/preview)
+  uv run --with numpy,tzdata python core_publish.py <jira> <gh> <YYYY-MM-DD> \
+      --deliver --slack=<slack_conn> --pdf=/agent/home/Core_Realm_flow_metrics_YYYY_MM.pdf
+
+Omit the date to use today (Europe/Madrid). --publish is idempotent: if the month
+is already present in data-core.json it does nothing but still regenerates the
+dashboards (safe to re-run). --report/--deliver can be re-run safely too (report
+just rebuilds the PDF; deliver renames the manifest to delivery_core_sent_<month>.json
+on success so a re-run reports "nothing pending" instead of double-posting).
+"""
 import sys, os, json, copy
 from datetime import date, datetime
 try:
