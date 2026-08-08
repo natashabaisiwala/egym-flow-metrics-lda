@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+"># -*- coding: utf-8 -*-
 """
 EGYM Flow Metrics — CORE realm publish/report/deliver (LDA space)  [reusable]
 ==============================================================================
@@ -34,7 +34,7 @@ dashboards (safe to re-run). --report/--deliver can be re-run safely too (report
 just rebuilds the PDF; deliver renames the manifest to delivery_core_sent_<month>.json
 on success so a re-run reports "nothing pending" instead of double-posting).
 """
-import sys, os, json, copy
+import sys, os, json, copy, base64
 from datetime import date, datetime
 try:
     from zoneinfo import ZoneInfo
@@ -76,6 +76,42 @@ CORRECTIONS = (
     "backlog\") -- were confirmed as evergreen/umbrella work and excluded on the "
     "same basis; historical months are unaffected."
 )
+
+# Dashboard-side counterpart of the CONN-885/CONN-1389 methodology note above.
+# Rendered as a banner on the mm (API Platform) team's own dashboard page via
+# generate_dashboards_live.py's existing team_notes_html()/team['note'] mechanism
+# (unmodified -- that mechanism already existed). Only ever gets attached to
+# data-core.json starting with the first NEW month published after this note
+# existed (see _ensure_team_note() call inside publish()) -- never touches
+# already-published history (Jul 26 and earlier).
+MM_TEAM_NOTE = (
+    "Two long-open API Platform epics -- CONN-885 (\"OneMMS maintenance\") and "
+    "CONN-1389 (\"OneMMS v2 backlog\") -- are excluded from FL2 delivered/cycle-time "
+    "metrics as evergreen/umbrella work (confirmed by Alexa Bobina, 2026-08-08). "
+    "Effective the Aug 2026 report onward; earlier months on this chart were "
+    "computed before the exclusion existed."
+)
+
+
+def _ensure_team_note(gh_conn, team_id, note_text):
+    """Fetch data-core.json fresh, set/refresh realm['teams'][team_id]['note'] if it
+    differs, and push. No-op (no write) if the note already matches exactly.
+    Scoped to Core's own script only -- does not touch the shared
+    update_data_live.py or generate_dashboards_live.py modules."""
+    r = call_tool('github_get_file_contents', {
+        'connectionId': gh_conn, 'owner': OWNER, 'repo': REPO, 'path': DATA_PATH})
+    data = json.loads(base64.b64decode(r['content'].replace('\n', '')).decode())
+    team = data['realms'][REALM]['teams'][team_id]
+    if team.get('note') == note_text:
+        return False
+    team['note'] = note_text
+    content = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+    call_tool('github_create_or_update_file', {
+        'connectionId': gh_conn, 'owner': OWNER, 'repo': REPO, 'path': DATA_PATH,
+        'message': f"Data (auto) {REALM}: add {team_id} Corrections note",
+        'content': content, 'sha': r['sha'],
+    })
+    return True
 
 
 def _today(override):
@@ -183,6 +219,13 @@ def publish(jira_conn, gh_conn, today, anchor_override=None, cadence_override=No
     if res["status"] != "updated":
         print(f"  {REALM} {month} already present — idempotent skip (no push).")
         return {"status": "duplicate", "month": month}
+
+    # Refresh the mm Corrections note (see MM_TEAM_NOTE above). This only ever
+    # runs for a genuinely brand-new month (the branch above already returned
+    # early for any already-published month), so it can never retroactively
+    # touch Jul 26 or earlier.
+    if _ensure_team_note(gh_conn, "mm", MM_TEAM_NOTE):
+        print("  mm Corrections note: added/refreshed")
 
     gen.run(gh_conn, [REALM], data_path=DATA_PATH)
     print(f"  PUBLISHED {REALM} {month} + dashboards regenerated")
