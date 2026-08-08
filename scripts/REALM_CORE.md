@@ -44,6 +44,27 @@ FL1-team/FL2-card schema).
   Evergreen/umbrella exclusions: `FL2_EXCLUDE = {GXY-4979, GXY-4966, GXY-7159, GXY-7928}`.
 - Core has a DORA stub page (placeholder); DORA is not computed by the engine.
 
+## Data provenance (inherited from the live repo's history — read before writing any Corrections narrative)
+- The live repo's Core history for **Jun 25 → Jun 26 (13 months) was MANUALLY seeded**
+  from Nave/manual reports, **NOT recomputed from Jira** (verified 2026-07-28 — see the
+  live agent's own `REALM_CORE.md` for the full proof). **Only Jul 26 onward is real
+  Jira-engine output** (the live repo's first automated month, run 20 Jul 2026).
+- `data-core.json` in THIS repo was seeded **verbatim** from the live repo's full
+  history (Jun 25 → Jul 26) at LDA onboarding time (2026-08-07/08), so it **inherits
+  the exact same manual-seed-vs-engine discontinuity at the Jun→Jul boundary**. This
+  is already historical fact baked into the seed — it needs no new action here.
+  **Do NOT** treat a Jun→Jul jump in the historical chart as a fresh anomaly, and
+  **do NOT** attempt to "fix" or recompute the manually-seeded months yourself.
+- DECISION (Alexa, 2026-07-28, live repo): **Option B** — keep the manually-seeded
+  history as-is. The live repo's Jul 2026 report already carried a one-time
+  Corrections note about the source switch; that note already happened upstream and
+  this LDA agent does not need to repeat it, unless a future report specifically
+  references the Jun→Jul step (e.g. someone asks about it directly).
+- A full engine backfill of pre-Jul-26 history has **not** been done anywhere
+  (deferred backlog item, live repo). If that ever happens upstream, `data-core.json`
+  here would need a matching re-seed — flag it to Alexa rather than doing it
+  unilaterally.
+
 ## Own orchestrator: `core_publish.py` (reusable, mock-tested)
 Direct single-shot analogue of the live repo's `monthly_run.py` Core path (Core is
 light — 5 teams, no batching needed, unlike Machine's `machine_monthly.py`/
@@ -86,13 +107,21 @@ no-op data write) and the anomaly-hold gate were also verified.
   realm agent instead of bottlenecking through Alexa.
 
 ## Corrections (report section — NEVER "errata")
-Standard methodology includes bugs in throughput. Two Core teams whose past manual
-reports excluded bugs shift up slightly under the automated engine: Core-Workouts
-(cw) and Operator Experience (ox). Users & Locations (ul), Data Science (ds), and
-API Platform (mm) already matched with bugs included, so no change for them.
-Evergreen/umbrella epics are excluded from FL2 delivered/cycle-time counts.
-(Decision: Alexa, 2026-07-28 — see the live agent's own `REALM_CORE.md` for full
-history/provenance context; this LDA agent does not need to re-derive it.)
+Two separate Corrections topics exist for Core (both already resolved upstream in the
+live repo — do not re-litigate either without Alexa):
+1. **Bugs-included methodology** (ongoing, still relevant to every report): standard
+   methodology includes bugs in throughput. Two Core teams whose past manual reports
+   excluded bugs shift up slightly under the automated engine: Core-Workouts (cw) and
+   Operator Experience (ox). Users & Locations (ul), Data Science (ds), and API
+   Platform (mm) already matched with bugs included, so no change for them. Evergreen/
+   umbrella epics are excluded from FL2 delivered/cycle-time counts.
+2. **Manual-seed vs. engine data-source switch** (one-time, historical — see the "Data
+   provenance" section above): the Jun→Jul 26 boundary in the history is a real
+   source/methodology discontinuity, already flagged once upstream (live repo's Jul
+   2026 report). Do not re-flag it every run — only mention it if a report or a
+   stakeholder question specifically touches the Jun→Jul step.
+(Decisions: Alexa, 2026-07-28 — see the live agent's own `REALM_CORE.md` for full
+history/provenance context; this LDA agent does not need to re-derive either.)
 
 ## Key files (this repo's `scripts/` folder, shared across realm agents)
 `compute_jira.py`, `update_data_live.py`, `generate_dashboards_live.py`,
