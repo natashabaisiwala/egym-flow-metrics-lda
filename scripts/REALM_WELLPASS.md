@@ -1,17 +1,25 @@
 # Wellpass Realm (LDA space) — How this agent works
 _Reference doc for the Wellpass realm agent in the parallel `egym-flow-metrics-lda`
-repo. Brand-new realm, engine-first from day one — no prior automation, no
-manual-seed period, no historical dashboard data to reconcile against. This is
-the FIRST computation ever produced for Wellpass — there is no "manual → engine"
-transition to explain in Corrections (unlike Core/Apps)._
+repo. Unlike a from-scratch realm, Wellpass has 13 months of Nave-verified
+history (May 25 – Jun 26) that was seeded into the older `egym-flow-metrics-live`
+repo on 2026-07-19 but never wired to any automation there — it sat frozen at
+Jun 26. That history has been migrated into this realm's own `data-wellpass.json`
+(schema-converted, old team keys remapped). This agent's first live-computed
+month is therefore the true "manual-seed → engine" boundary for Wellpass — see
+Data provenance below before writing any Corrections narrative._
 
 ## Status
 - Onboarded to the LDA space (parallel repo `oleksandrabobina/egym-flow-metrics-lda`,
   independent of the live repo `egym-flow-metrics-live`, which stays untouched).
 - Own data file: **`data-wellpass.json`** at repo root — contains ONLY
-  `{"realms": {"wellpass": {...}}}`. Seeded EMPTY (no months, teams present with
-  empty fl1/fl2 arrays) — there is no manual history to backfill.
-  Never write to `data-core.json`, `data-apps.json`, or `data-machine.json`.
+  `{"realms": {"wellpass": {...}}}`. Seeded with **13 months of migrated,
+  Nave-verified history (May 25 – Jun 26)**, sourced from the older
+  `egym-flow-metrics-live` repo's one-time 2026-07-19 seed commit (which was
+  never wired to any ongoing automation for Wellpass — see Data provenance).
+  Schema-converted to match `data-core.json`/`data-apps.json` (deprecated
+  `wipAge`/`tpYTD` fields dropped, old team keys remapped 1:1 to
+  `WELLPASS_TEAMS`). Never write to `data-core.json`, `data-apps.json`, or
+  `data-machine.json`.
 - Own dashboard pages: **`wellpass/`** folder (`wellpass/index.html`,
   `wellpass/realm-dashboard.html`, one page per team). Never write to `core/`,
   `apps/`, `machine/`, or the 3 shared cross-realm pages (`index.html`,
@@ -59,11 +67,33 @@ fl1+fl2 schema, same shape as `CORE_TEAMS`/`APPS_TEAMS`.
   action needed here.
 
 ## Data provenance
-No manual-seed period. The engine computes real numbers from day one — there is
-no prior "official" number to reconcile against, so no Option A/B Corrections
-note is needed at launch. If any team's freshly-computed numbers look surprising
-relative to informal/anecdotal expectations, treat that as a normal anomaly (see
-procedure below) — NOT a data-provenance discontinuity.
+- Wellpass's Jun 25 → Jun 26 history (13 months) was **manually seeded from
+  Nave-verified reports into the older `egym-flow-metrics-live` repo on
+  2026-07-19**, in the same one-shot commit that seeded Core/Apps/Machine
+  there. Verified by reading that repo's commit history and `data.json`.
+- Unlike Core/Apps/Machine in that same repo, **Wellpass's seed was never
+  wired to any ongoing automation** — Core/Apps/Machine went on to receive
+  monthly "Data (auto)" commits, but Wellpass sat frozen at "Jun 26" with zero
+  subsequent updates. This gap is exactly what this LDA agent exists to fill.
+- That 13-month history was migrated into THIS repo's `data-wellpass.json`
+  (2026-08-08, approved by Alexa Bobina): old team keys were remapped 1:1 to
+  `WELLPASS_TEAMS` (e.g. `act1`→`cgr`, `eng1`→`aex`, `acc`→`act`, etc.), and
+  deprecated schema fields not used by the standard engine schema (`wip`,
+  `wipAge`, `tpYTD` on fl1; `wipAge` on fl2) were dropped. All array lengths
+  were verified against the 13-month count during migration.
+- Because that history was manually seeded (not recomputed from Jira), it is a
+  **manual-seed period**, exactly like Core/Apps had before their own engine
+  boundaries. **This agent's first live-computed month is the true
+  manual-seed-to-engine boundary for Wellpass** — treat that transition the
+  same way `REALM_APPS.md`'s Data provenance section treats the Apps
+  Jun→Jul-26 boundary: it is expected historical fact, not a fresh anomaly.
+  Do NOT attempt to "fix" or recompute the manually-seeded months yourself.
+- If any team's freshly-computed (post-migration) numbers look surprising
+  relative to the migrated history, treat that as a normal anomaly (see
+  procedure below) unless it specifically traces to the manual-seed → engine
+  boundary itself — in that case, add a one-time Corrections note about the
+  source switch (mirroring Apps' Option B) rather than treating it as a
+  culprit-epic anomaly.
 
 ## Anomaly resolution procedure (evergreen-epic rule)
 If an FL2 anomaly traces to one/few specific epics AND manual Jira review
@@ -127,8 +157,16 @@ dashboard HTML ONLY under `wellpass/`, zero touch of any other realm's files.
   **Luis Torres** `<@U092X5N5073>`, **Natasha Baisiwala** `<@U06HWLH1H5H>`.
 
 ## Corrections (report section — NEVER "errata")
-None yet — this is the first-ever computation for this realm. Add entries here
-only when a real data/methodology correction is confirmed and shipped.
+One standing topic at launch:
+1. **Manual-seed vs. engine data-source switch** (one-time, historical — see
+   "Data provenance" above): the migrated May 25 – Jun 26 history was manually
+   seeded from Nave reports (via the older live repo), not recomputed from
+   Jira. This agent's first live-computed month is the real source switch —
+   flag it once with a Corrections note the first time it publishes, mirroring
+   how `REALM_APPS.md` documents its own Jun→Jul-26 boundary. Do not re-flag it
+   on every subsequent run.
+Add further entries here only when a new real data/methodology correction is
+confirmed and shipped.
 
 ## Your own instructions are your source of truth
 This document (and this agent's own instructions) are the operational source of
