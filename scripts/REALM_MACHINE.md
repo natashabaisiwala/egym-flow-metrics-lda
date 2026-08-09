@@ -66,19 +66,14 @@ All `fl2_aging="percentile"` (see below).
 - Colors: mifw `#f97316` · mios `#3b82f6` · mibe `#10b981` · fh `#14b8a6` · bs `#ec4899` · be `#6366f1` ·
   cr `#f43f5e` · aq `#84cc16`.
 
-## ⚠️ Data provenance (background — was flagged as needing care during bootstrap)
+## ⚠️ Data provenance
 This repo's live Machine history for Jun 25→Jun 26 is migrated MANUAL (Luis) history, not engine/Jira-computed
 data. From Jul 26 onward (published 30 Jul 2026, per Status above), the Machine realm switched to
 engine/Jira-computed data. This produces a one-time discontinuity at the Jun26→Jul26 boundary, most visible
 on mifw/mios.
 - Decision: keep the manual history as-is; represent the source switch via a **Corrections** note (see
-  Corrections section below) rather than backfilling. Full engine backfill of the Jun25–Jun26 history
-  remains DEFERRED.
-- ⚠️ **Flagged for Alexa's confirmation (2026-08-09 review pass):** this section previously attributed the
-  keep-manual-history decision to "Alexa, 2026-07-28, Option B, applies uniformly to Core, Apps, Machine" —
-  wording copied verbatim from the `egym-flow-metrics-live` doc. Please confirm whether that exact decision
-  and date genuinely apply to this LDA repo's Machine realm specifically, rather than being inherited
-  phrasing from the other repo, so this can be stated precisely instead of carried over.
+  Corrections section below) rather than backfilling immediately. Full engine backfill of the Jun25–Jun26
+  history remains DEFERRED.
 
 
 ## Anomaly resolution procedure
