@@ -41,7 +41,11 @@ FL1-team/FL2-card schema).
   throughput. Cycle time = p85 linear. WIP aging R/Y/G = p70/p85 linear.
 - FL2 delivered = status changed to Done during rolling 120-day window, passed
   through a Doing stage. FL2 percentile estimator = nearest-rank 'higher'.
-  Evergreen/umbrella exclusions: `FL2_EXCLUDE = {GXY-4979, GXY-4966, GXY-7159, GXY-7928}`.
+  Evergreen/umbrella exclusions: `FL2_EXCLUDE = {GXY-4979, GXY-4966, GXY-7159, GXY-7928,
+  CONN-885, CONN-1389}` (CONN-885 "OneMMS maintenance" and CONN-1389 "OneMMS v2 backlog"
+  added 2026-08-08, both confirmed as evergreen/umbrella epics by Alexa Bobina — same
+  standing rule as the original 4 GXY exclusions: exact human-approved keys only, never
+  an age/title heuristic).
 - Core has a DORA stub page (placeholder); DORA is not computed by the engine.
 
 ## Data provenance (inherited from the live repo's history — read before writing any Corrections narrative)
