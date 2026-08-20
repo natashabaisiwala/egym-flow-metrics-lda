@@ -223,6 +223,8 @@ FL2_EXCLUDE = {
     "GXY-7928",   # Speed up UPDS search per gym II (created 2024-09)
     "CONN-885",   # OneMMS maintenance (created 2020-04, evergreen/umbrella; confirmed by Alexa Bobina 2026-08-08)
     "CONN-1389",  # OneMMS v2 backlog (created 2022-01, evergreen/umbrella; confirmed by Alexa Bobina 2026-08-08)
+    "GXY-8151",   # Misc UPDS improvements and bug fixes - 2026 (created 2025-12, evergreen/umbrella bucket; confirmed by Alexa Bobina 2026-08-20)
+    "GXY-7117",   # xID Transition Phase 1 (created 2024-05, result of a cleanup, not an open-ended delivery; confirmed by Alexa Bobina 2026-08-20)
 }
 
 MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
