@@ -59,7 +59,17 @@ async def _areq(name, args, tries=5):
 # ul  = GXY  (Users & Locations)     cw = CW   (Core-Workouts)
 # ox  = OX   (Operator Experience)   ds = DS   (Data Science)
 # mm  = CONN (API Platform, ex-MMS Connect)
-CORE_TEAMS = {"ul": "GXY", "cw": "CW", "ox": "OX", "ds": "DS", "mm": "CONN"}
+# worked_only=True (confirmed by Alexa Bobina 2026-08-20): FL1 throughput/cycle-time
+# excludes items that went straight "To Do -> Done" without ever passing through a
+# Doing status. Without this, administrative straight-to-done closures inflate
+# throughput and distort the cycle-time distribution. Applied to all 5 Core teams.
+CORE_TEAMS = {
+    "ul": {"status_project": "GXY",  "fl1": "project = GXY",  "bugs": "project = GXY AND issuetype = Bug",  "worked_only": True},
+    "cw": {"status_project": "CW",   "fl1": "project = CW",   "bugs": "project = CW AND issuetype = Bug",   "worked_only": True},
+    "ox": {"status_project": "OX",   "fl1": "project = OX",   "bugs": "project = OX AND issuetype = Bug",   "worked_only": True},
+    "ds": {"status_project": "DS",   "fl1": "project = DS",   "bugs": "project = DS AND issuetype = Bug",   "worked_only": True},
+    "mm": {"status_project": "CONN", "fl1": "project = CONN", "bugs": "project = CONN AND issuetype = Bug", "worked_only": True},
+}
 
 # ─── Machine realm team mapping (8 teams, confirmed with Taner Pereira, Jul 2026) ─
 # A team scope may be a plain project string (like Core) OR a rich dict when the team
