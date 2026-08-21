@@ -276,7 +276,37 @@ def build_report(gh_conn, today, notes_path, out_path, anchor_override=None,
     rv["corrections"] = CORRECTIONS
     if not out_path:
         out_path = os.path.join(DIR, f"Core_Realm_flow_metrics_{anchor.strftime('%Y_%m')}.pdf")
-    bp.build_realm_pdf(rv, REALM, anchor.isoformat(), month_full, out_path, notes=notes)
+
+    # DORA page: real chart screenshots (white background), captured from the
+    # "DORA METRICS - CORE REALM" Google Sheet. Stored in the repo as base64-text
+    # sidecars (scripts/dora_assets/*.png.b64) because GitHub file pushes here go
+    # through a text-content path that UTF-8-encodes the content -- raw binary PNG
+    # bytes get corrupted, but pure-ASCII base64 text round-trips losslessly. This
+    # decodes each sidecar into a real .png next to it (only when missing or stale)
+    # before handing paths to build_realm_pdf. Falls back to the placeholder page
+    # automatically if no sidecars are present.
+    dora_dir = os.path.join(DIR, "dora_assets")
+    dora_candidates = [
+        ("MTTD & MTTR Dashboard", "mttd_white.png.b64", "mttd_white.png",
+         "Source: \"DORA METRICS - CORE REALM\" Google Sheet, MTTD & MTTR Dashboard tab."),
+        ("Deployment Dashboard", "deploy_white.png.b64", "deploy_white.png",
+         "Source: \"DORA METRICS - CORE REALM\" Google Sheet, Deployment Dashboard tab."),
+    ]
+    dora_images = []
+    for dtitle, b64_name, png_name, note in dora_candidates:
+        b64_path = os.path.join(dora_dir, b64_name)
+        if not os.path.exists(b64_path):
+            continue
+        png_path = os.path.join(dora_dir, png_name)
+        if not os.path.exists(png_path) or os.path.getmtime(b64_path) > os.path.getmtime(png_path):
+            with open(b64_path, "r") as f:
+                raw = base64.b64decode(f.read())
+            with open(png_path, "wb") as f:
+                f.write(raw)
+        dora_images.append({"title": dtitle, "path": png_path, "source_note": note})
+    dora_images = dora_images or None
+
+    bp.build_realm_pdf(rv, REALM, anchor.isoformat(), month_full, out_path, notes=notes, dora_images=dora_images)
     print(f"  PDF written: {out_path}")
     return out_path
 
