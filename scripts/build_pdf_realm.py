@@ -21,6 +21,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.utils import ImageReader
 
 W, H = A4
 ORANGE=Color(0.753,0.353,0.157); INK=Color(0.10,0.10,0.10); BLUE=Color(0.109,0.353,0.529)
@@ -257,7 +258,7 @@ def _epics_caveat(c, y, fl2):
                'so it is not a full 85th-percentile distribution.',MARGIN,y,W-2*MARGIN,
                size=6.8,leading=9,color="#333333")
 
-def build_realm_pdf(realm, realm_id, anchor_iso, month_label, out_path, notes=None):
+def build_realm_pdf(realm, realm_id, anchor_iso, month_label, out_path, notes=None, dora_images=None):
     """Render `realm` (data.json-shaped dict, full history) to a print-ready A4 PDF.
 
     `notes` (optional) adds LLM-authored narrative to the report:
@@ -265,7 +266,15 @@ def build_realm_pdf(realm, realm_id, anchor_iso, month_label, out_path, notes=No
        "epics": [html_bullet, ...],        # rendered above the FL2 cards
        "epics_callout": "html"}            # optional highlighted box on the FL2 page
     Bullets are Paragraph HTML (use <b>..</b>, <i>..</i>). Keep them concise so the
-    cards still fit on the page (roughly <=6 FL1 bullets, <=4 FL2 bullets)."""
+    cards still fit on the page (roughly <=6 FL1 bullets, <=4 FL2 bullets).
+
+    `dora_images` (optional) replaces the default "not included" DORA placeholder
+    page with one full page per entry, each entry a dict:
+      {"title": "MTTD & MTTR Dashboard", "path": "/agent/home/....png",
+       "source_note": "optional caption, e.g. data source + capture date"}
+    Images are placed on the report's normal white page (logo + title header,
+    same as every other page), scaled to fit within the margins preserving
+    aspect ratio. Only used for realms not in NO_DORA_REALMS; ignored otherwise."""
     global NCOLS, CW, NF, TF
     import copy
     realm=copy.deepcopy(realm)
@@ -371,11 +380,30 @@ def build_realm_pdf(realm, realm_id, anchor_iso, month_label, out_path, notes=No
         c.showPage()
     # P5 DORA (skipped for realms that never had it)
     if realm_id not in NO_DORA_REALMS:
-        logo(c); title(c,"D","ORA Metrics",yoff=74,size=30)
-        callout(c,'<b>Not included in this automated report.</b> The DORA section (MTTD / MTTR, root-cause severity, '
-                  'change-failure rate and deployment counts) is sourced from incident and deployment data, <b>not</b> from '
-                  'the Jira flow-metrics pipeline that generates pages 1-4.',132)
-        c.showPage()
+        if dora_images:
+            for img in dora_images:
+                logo(c); title(c,"D","ORA Metrics",yoff=74,size=30)
+                sub=img.get("title")
+                top_yoff=112
+                if sub:
+                    c.setFont("Helvetica-Bold",13); c.setFillColor(INK)
+                    c.drawCentredString(W/2,T(100),sub)
+                note=img.get("source_note")
+                note_h=26 if note else 0
+                ir=ImageReader(img["path"]); iw,ih=ir.getSize()
+                max_w=W-2*MARGIN; max_h=(H-MARGIN)-top_yoff-note_h
+                scale=min(max_w/iw,max_h/ih); dw,dh=iw*scale,ih*scale
+                ix=(W-dw)/2; iy_top=T(top_yoff); iy=iy_top-dh
+                c.drawImage(ir,ix,iy,width=dw,height=dh,preserveAspectRatio=True,mask='auto')
+                if note:
+                    para(c,note,MARGIN,top_yoff+dh+14,W-2*MARGIN,size=7.6,leading=10,color="#666666",space=0)
+                c.showPage()
+        else:
+            logo(c); title(c,"D","ORA Metrics",yoff=74,size=30)
+            callout(c,'<b>Not included in this automated report.</b> The DORA section (MTTD / MTTR, root-cause severity, '
+                      'change-failure rate and deployment counts) is sourced from incident and deployment data, <b>not</b> from '
+                      'the Jira flow-metrics pipeline that generates pages 1-4.',132)
+            c.showPage()
     c.save()
     return out_path
 
