@@ -70,8 +70,10 @@ def validate(team_values):
 # (previous == 0 OR relative move >= pct_threshold). tech uses pct=0 so any
 # absolute swing >= its abs_threshold (in percentage points) is flagged.
 _THRESH = {
-    "fl1": {"ct": (0.6, 25), "tp": (0.5, 25), "tech": (0.0, 25), "bC": (0.6, 15), "bR": (0.6, 15)},
-    "fl2": {"ct": (0.6, 40), "del": (0.6, 3), "wip": (0.6, 5), "tech": (0.0, 25)},
+    "fl1": {"ct": (0.6, 25), "tp": (0.5, 25), "tech": (0.0, 25), "bC": (0.6, 15), "bR": (0.6, 15),
+            "wR": (0.6, 3), "wY": (0.6, 3), "wG": (0.6, 3)},
+    "fl2": {"ct": (0.6, 40), "del": (0.6, 3), "wip": (0.6, 5), "tech": (0.0, 25),
+            "wR": (0.6, 3), "wY": (0.6, 3), "wG": (0.6, 3)},
 }
 _WIP_THRESH = (0.6, 5)  # FL1 total WIP (wR+wY+wG)
 
