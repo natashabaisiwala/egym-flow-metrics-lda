@@ -277,8 +277,9 @@ def build_report(gh_conn, today, notes_path, out_path, anchor_override=None,
     if not out_path:
         out_path = os.path.join(DIR, f"Core_Realm_flow_metrics_{anchor.strftime('%Y_%m')}.pdf")
 
-    # DORA page: real chart screenshots (white background), captured from the
-    # "DORA METRICS - CORE REALM" Google Sheet. Stored in the repo as base64-text
+    # DORA page: real chart screenshots pasted as-is on their native dark background
+    # (matches the pre-automation manual report's look -- no color conversion), captured
+    # from the "DORA METRICS - CORE REALM" Google Sheet. Stored in the repo as base64-text
     # sidecars (scripts/dora_assets/*.png.b64) because GitHub file pushes here go
     # through a text-content path that UTF-8-encodes the content -- raw binary PNG
     # bytes get corrupted, but pure-ASCII base64 text round-trips losslessly. This
@@ -287,9 +288,9 @@ def build_report(gh_conn, today, notes_path, out_path, anchor_override=None,
     # automatically if no sidecars are present.
     dora_dir = os.path.join(DIR, "dora_assets")
     dora_candidates = [
-        ("MTTD & MTTR Dashboard", "mttd_white.png.b64", "mttd_white.png",
+        ("MTTD & MTTR Dashboard", "mttd_dora.png.b64", "mttd_dora.png",
          "Source: \"DORA METRICS - CORE REALM\" Google Sheet, MTTD & MTTR Dashboard tab."),
-        ("Deployment Dashboard", "deploy_white.png.b64", "deploy_white.png",
+        ("Deployment Dashboard", "deploy_dora.png.b64", "deploy_dora.png",
          "Source: \"DORA METRICS - CORE REALM\" Google Sheet, Deployment Dashboard tab."),
     ]
     dora_images = []
