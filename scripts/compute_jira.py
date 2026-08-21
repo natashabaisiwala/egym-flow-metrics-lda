@@ -348,6 +348,30 @@ def _ryg(ages, cts, method="linear"):
     g = sum(1 for a in ages if a < p70)
     return r, y, g
 
+# Manifest-persistence traceability (added 2026-08-20, confirmed by Alexa Bobina, after
+# a CW FL1 WIP Aging Risk figure could not be reconciled after publish and was traced to
+# an unreproducible one-off computation defect). _ryg_keys buckets the SAME (issue_key,
+# age) pairs into Red/Yellow/Green ISSUE-KEY LISTS using the identical percentile
+# thresholds _ryg uses for its counts, so len(list) always equals the paired _ryg count
+# by construction -- there is no way for the two to drift apart. Callers should persist
+# these lists into the delivery manifest (never into the public data.json time series,
+# to avoid bloating dashboard data) so a future "why is X red?" question has a direct,
+# first-source answer instead of requiring after-the-fact Jira changelog forensics.
+# Purely additive: does not change any existing counts/values for any realm/team.
+def _ryg_keys(aged, cts, method="linear"):
+    """aged: list of (issue_key, age_days) tuples (age_days may be None, filtered out).
+    Returns (red_keys, yellow_keys, green_keys) -- lists of issue keys, using the same
+    thresholds/edge-cases as _ryg (no cts distribution -> everything counts as green)."""
+    aged = [(k, a) for k, a in aged if a is not None]
+    if not cts:
+        return [], [], [k for k, _ in aged]
+    p70 = np.percentile(cts, 70, method=method)
+    p85 = np.percentile(cts, 85, method=method)
+    red = [k for k, a in aged if a > p85]
+    yellow = [k for k, a in aged if p70 <= a <= p85]
+    green = [k for k, a in aged if a < p70]
+    return red, yellow, green
+
 # ─── FL1 (tasks) ────────────────────────────────────────────────────────────────
 def _fl1_buckets(conn, project, done_extra=None):
     """Derive per-project FL1 status buckets from Jira statusCategory (workflow-agnostic).
@@ -418,22 +442,27 @@ async def _fl1(conn, cfg, anchor, sem):
     # WIP snapshot at anchor (items in a Doing status at report date)
     wip = _search_all(conn,
         f'({scope}) AND issuetype in {FL1_TYPES} AND status WAS IN ({doing_ids}) ON "{anchor.isoformat()}"',
-        ["id"])
+        ["id", "key"])
     snap = datetime(anchor.year, anchor.month, anchor.day, 23, 59, 59, tzinfo=timezone.utc)
     wtrs = await asyncio.gather(*[_transitions(conn, i["id"], sem) for i in wip])
     ages = []
-    for tr in wtrs:
+    aged_keys = []  # (issue_key, age_days) for valid WIP items -- see _ryg_keys.
+    for i, tr in zip(wip, wtrs):
         # Exclude items whose status at the snapshot instant is NOT actually Doing
         # (e.g. items completed on the report day itself must not count as WIP).
         if _status_at(tr, snap) not in doing:
             continue
         d0 = _first_enter(tr, doing, before=snap)
         if d0 is not None:
-            ages.append((snap - d0).total_seconds() / 86400)
+            age = (snap - d0).total_seconds() / 86400
+            ages.append(age)
+            aged_keys.append((i["key"], age))
     wR, wY, wG = _ryg(ages, cts)
+    wR_keys, wY_keys, wG_keys = _ryg_keys(aged_keys, cts)
 
     return {"ct": ct_p85, "tp": tp_n, "wR": wR, "wY": wY, "wG": wG,
-            "bC": bC, "bR": bR, "tech": tech_pct}
+            "bC": bC, "bR": bR, "tech": tech_pct,
+            "wR_keys": wR_keys, "wY_keys": wY_keys, "wG_keys": wG_keys}
 
 # ─── FL2 (epics) ─────────────────────────────────────────────────────────────────
 # Epic WIP Aging Risk buckets, "weekly" (absolute) variant used by Machine MSW/MI cards.
@@ -444,6 +473,13 @@ def _ryg_weekly(ages):
     Y = sum(1 for a in ages if FL2_AGING_GREEN_D <= a <= FL2_AGING_RED_D)
     G = sum(1 for a in ages if a < FL2_AGING_GREEN_D)
     return R, Y, G
+
+# Keys-variant of _ryg_weekly, same manifest-persistence rationale as _ryg_keys above.
+def _ryg_weekly_keys(aged):
+    red = [k for k, a in aged if a > FL2_AGING_RED_D]
+    yellow = [k for k, a in aged if FL2_AGING_GREEN_D <= a <= FL2_AGING_RED_D]
+    green = [k for k, a in aged if a < FL2_AGING_GREEN_D]
+    return red, yellow, green
 
 async def _fl2(conn, cfg, anchor, sem, realm="core"):
     start_s, end_s = _window(anchor)
@@ -486,23 +522,29 @@ async def _fl2(conn, cfg, anchor, sem, realm="core"):
     doing_names = ",".join('"%s"' % s for s in FL2_DOING_NAMES)
     cand = _search_all(conn,
         f'({scope}) AND issuetype=Epic AND status WAS IN ({doing_names}) ON "{anchor.isoformat()}"',
-        ["id"])
+        ["id", "key"])
     snap = datetime(anchor.year, anchor.month, anchor.day, 23, 59, 59, tzinfo=timezone.utc)
     wtrs = await asyncio.gather(*[_transitions(conn, i["id"], sem) for i in cand])
     ages = []
-    for tr in wtrs:
+    aged_keys = []  # (issue_key, age_days) for valid WIP epics -- see _ryg_keys.
+    for i, tr in zip(cand, wtrs):
         if _status_at(tr, snap) not in doing:
             continue
         s = _first_enter(tr, {FL2_START}, before=snap) or _first_enter(tr, doing, before=snap)
         if s:
-            ages.append((snap - s).total_seconds() / 86400)
+            age = (snap - s).total_seconds() / 86400
+            ages.append(age)
+            aged_keys.append((i["key"], age))
     wip_n = len(ages)
     if cfg.get("fl2_aging") == "weekly":
         wR, wY, wG = _ryg_weekly(ages)
+        wR_keys, wY_keys, wG_keys = _ryg_weekly_keys(aged_keys)
     else:
         wR, wY, wG = _ryg(ages, cts, method="higher")
+        wR_keys, wY_keys, wG_keys = _ryg_keys(aged_keys, cts, method="higher")
 
-    return {"ct": ct_p85, "del": n, "wip": wip_n, "wR": wR, "wY": wY, "wG": wG, "tech": tech_pct}
+    return {"ct": ct_p85, "del": n, "wip": wip_n, "wR": wR, "wY": wY, "wG": wG, "tech": tech_pct,
+            "wR_keys": wR_keys, "wY_keys": wY_keys, "wG_keys": wG_keys}
 
 # ─── Orchestration ───────────────────────────────────────────────────────────────
 async def _compute_team(conn, cfg, anchor, sem, realm="core"):
