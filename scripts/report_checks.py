@@ -24,9 +24,14 @@ def validate(team_values):
     for tk, tv in team_values.items():
         fl1 = tv.get("fl1", {}); fl2 = tv.get("fl2", {})
 
-        # types
+        # types (skip *_keys fields -- manifest-only issue-key lists added to
+        # compute_jira.py on 2026-08-20 for delivery-manifest traceability, e.g.
+        # wR_keys/wY_keys/wG_keys on fl1/fl2. These are lists of issue keys, not
+        # real int/None metrics, and were never meant to be validated here.)
         for fl_name, fl in (("fl1", fl1), ("fl2", fl2)):
             for k, v in fl.items():
+                if k.endswith("_keys"):
+                    continue
                 if not _is_int_or_none(v):
                     errs.append(f"{tk}.{fl_name}.{k} is not int/None: {v!r}")
 
