@@ -58,6 +58,9 @@ DATA_PATH = "data-apps.json"
 OWNER = "oleksandrabobina"
 REPO = "egym-flow-metrics-lda"
 DASH = f"https://{OWNER}.github.io/{REPO}/{REALM}/index.html"
+NOTION_REPORT_PAGE = ("https://app.notion.com/p/EGYM-Flow-Metrics-Report-"
+                       "1cbd894dd22a805aba70fd917ada71b1"
+                       "#3c6d894dd22a800198f8e8c74f6870df")
 
 # Slack delivery — same routing as the live Apps realm (see REALM_APPS.md).
 CHANNEL = "C9CBU5S3C"                       # #sw-team-lda
@@ -242,7 +245,8 @@ def deliver(slack_conn, today, pdf_path, anchor_override=None, cadence_override=
     msg = (f"\U0001F4CA *Apps Realm \u2014 Flow Metrics \u00b7 {month_full}*\n"
            f"The {month_full} flow metrics report for the *Apps Realm* is ready.\n"
            f"\U0001F4C4 PDF attached \u00b7 \U0001F4C8 Live dashboard: <{DASH}|Apps Realm dashboard>\n\n"
-           f"{tags} \u2014 please review. If everything looks good, please share onward with your "
+           f"{tags} \u2014 please review. If everything looks good, please upload the pdf to the "
+           f"<{NOTION_REPORT_PAGE}|Notion page>, and share onward with your "
            f"Head of Realm both \u2013 the PDF and the link to the dashboard. If anything looks off, "
            f"please reach out to <https://app.dataleap.ai/agents/a_czovrnggcqhn8vh32dpi|the Agent>.\n\n"
            f"_Automatically generated \u00b7 rolling 120-day window (through {report_date})_")
