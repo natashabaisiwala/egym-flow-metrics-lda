@@ -124,12 +124,22 @@ MACHINE_FL2 = {
 # their work was redistributed to the new boards, so per-team figures no longer
 # reflect reality. BMA Platform is intentionally NOT reported yet (team not active).
 #   trainer: composite scope across projects/components/labels (status buckets from MA).
+# worked_only=True (confirmed by Alexa Bobina 2026-08-24, same rationale as Core, see
+# CORE_TEAMS above): FL1 throughput/cycle-time excludes items that went straight
+# "To Do -> Done" without ever passing through a Doing status, so purely administrative
+# closures stop inflating throughput/tech%. Applied to all 4 Apps teams. Recomputed and
+# diffed before/after for the pending Aug 2026 cadence anchor (2026-08-25) prior to this
+# change: WIP and bug counts are unaffected (verified byte-identical); throughput drops
+# (bma_core_growth 95->67, bma_engagement 78->68, trainer 100->98, workout 62->61) and
+# cycle-time p85 is unchanged for all 4 teams (cycle-time was already excluding items
+# with no recorded Doing-entry timestamp, independent of this flag).
 APPS_TEAMS = {
-    "bma_core_growth": "BMACG",
-    "bma_engagement": "BMAEA",
+    "bma_core_growth": {"status_project": "BMACG",  "fl1": "project = BMACG",  "bugs": "project = BMACG AND issuetype = Bug",  "worked_only": True},
+    "bma_engagement": {"status_project": "BMAEA",   "fl1": "project = BMAEA",  "bugs": "project = BMAEA AND issuetype = Bug",  "worked_only": True},
     "trainer": {"status_project": "MA",
-                "fl1": '(project in (10033) OR project = 10052 OR component = "iOS TA" OR labels in (pairing, TrainerApp))'},
-    "workout": "XT",
+                "fl1": '(project in (10033) OR project = 10052 OR component = "iOS TA" OR labels in (pairing, TrainerApp))',
+                "worked_only": True},
+    "workout": {"status_project": "XT",  "fl1": "project = XT",  "bugs": "project = XT AND issuetype = Bug",  "worked_only": True},
 }
 
 # --- Wellpass realm team mapping (8 teams; confirmed real Wellpass delivery teams
