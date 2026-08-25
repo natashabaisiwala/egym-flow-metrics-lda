@@ -150,17 +150,27 @@ APPS_TEAMS = {
 # realm's data-wellpass.json (schema-converted, deprecated wipAge/tpYTD fields
 # dropped, old team keys remapped 1:1) — see scripts/REALM_WELLPASS.md for the
 # full provenance. This agent's first live-computed month is the true
-# manual-seed-to-engine boundary for Wellpass. All 8 teams are plain
-# project scopes (worked_only=False, done_extra=None), standard fl1+fl2 schema.
+# manual-seed-to-engine boundary for Wellpass.
+#
+# worked_only=True enabled for all 8 teams (Luis Torres, 2026-08-25): root-caused
+# against WP Partner Integrations vs Nave (window 2026-04-20..2026-08-18) that ~61
+# of 164 raw items never passed through an actual in-progress status before Done
+# (bulk vulnerability-scanner "va:"-labeled tickets and templated bulk migration/
+# security tasks dominated the gap) -- applying worked_only matched Nave exactly
+# for Task/Story/Maintenance. Per-team "Doing"-equivalent status naming differences
+# are handled automatically since _fl1_buckets() derives doing/done id sets per
+# Jira project via statusCategory (indeterminate), not by hardcoded status name, so
+# this is safe to apply uniformly across all 8 teams without per-team confirmation
+# of their specific in-progress status name.
 WELLPASS_TEAMS = {
-    "cgr": "WPCGR",   # WP Company Growth
-    "acq": "WPACQ",   # WP Offer & Acquisition
-    "aex": "WPAEX",   # WP Access Experience
-    "dis": "WPDIS",   # WP Discovery
-    "pex": "WPPEX",   # WP Partner Experience
-    "int": "WPINT",   # WP Partner Integrations
-    "mot": "WPMOT",   # WP Motivation
-    "act": "WPACT",   # WP Activation
+    "cgr": {"status_project": "WPCGR", "fl1": "project = WPCGR", "worked_only": True},   # WP Company Growth
+    "acq": {"status_project": "WPACQ", "fl1": "project = WPACQ", "worked_only": True},   # WP Offer & Acquisition
+    "aex": {"status_project": "WPAEX", "fl1": "project = WPAEX", "worked_only": True},   # WP Access Experience
+    "dis": {"status_project": "WPDIS", "fl1": "project = WPDIS", "worked_only": True},   # WP Discovery
+    "pex": {"status_project": "WPPEX", "fl1": "project = WPPEX", "worked_only": True},   # WP Partner Experience
+    "int": {"status_project": "WPINT", "fl1": "project = WPINT", "worked_only": True},   # WP Partner Integrations
+    "mot": {"status_project": "WPMOT", "fl1": "project = WPMOT", "worked_only": True},   # WP Motivation
+    "act": {"status_project": "WPACT", "fl1": "project = WPACT", "worked_only": True},   # WP Activation
 }
 
 def _normalize_cfg(val):
