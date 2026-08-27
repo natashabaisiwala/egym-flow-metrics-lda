@@ -263,7 +263,16 @@ MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 # Per-realm report cadence day (official Notion how-to). Reports for different realms
 # are generated on different days of the month. The exact time of day is NOT important
 # (residual ±1–5 boundary noise is accepted); only the calendar day + weekend roll-forward.
-REALM_CADENCE = {"wellpass": 15, "core": 20, "apps": 25, "machine": 30}
+REALM_CADENCE = {"wellpass": 1, "core": 20, "apps": 25, "machine": 30}
+
+# Realms whose FL1 population is a calendar month (the month BEFORE the report
+# anchor's own month) instead of the rolling 120-day window, and whose FL1 WIP
+# metric is a monthly Average WIP (mean ticket-days in a Doing status per day of
+# the month) instead of a Red/Yellow/Green report-date snapshot. Wellpass only,
+# starting Aug 2026. Core/Apps/Machine are NEVER in this set and are fully
+# unaffected -- every branch below defaults to the pre-existing rolling-window
+# behavior when realm not in REALM_CALENDAR_MONTH_FL1.
+REALM_CALENDAR_MONTH_FL1 = {"wellpass"}
 
 # ─── Date helpers ───────────────────────────────────────────────────────────────
 def report_anchor(year, month, realm="core"):
@@ -419,18 +428,75 @@ def _fl1_buckets(conn, project, done_extra=None):
         sid = str(sid); done.add(sid); done_tp.add(sid); names.setdefault(sid, sid)
     return doing, done, done_tp, names
 
-async def _fl1(conn, cfg, anchor, sem):
-    start_s, end_s = _window(anchor)
-    win = f'("{start_s}","{end_s}")'
-    scope = cfg["fl1"]; bugs_base = cfg["bugs"]
-    doing, done, done_tp, names = _fl1_buckets(conn, cfg["status_project"], cfg.get("done_extra"))
-    doing_ids = ",".join(sorted(doing))
+def _calendar_month_bounds(anchor):
+    """For a calendar-month-FL1 realm, `anchor` is the report cadence anchor -- day 1
+    (rolled to the next business day) of the month AFTER the one being reported
+    (Wellpass's post-Aug-2026 cadence). Returns (start_date, end_excl_date) for the
+    full calendar month being reported, i.e. the month before anchor's own month.
+    This is also reused directly by the one-off Jan-Jul 2026 backfill script, which
+    simply passes a synthetic anchor = date(year, month+1, 1) for each historical
+    month it needs -- no separate month-selection code path is needed."""
+    if anchor.month == 1:
+        y, m = anchor.year - 1, 12
+    else:
+        y, m = anchor.year, anchor.month - 1
+    start = date(y, m, 1)
+    end_excl = date(anchor.year, anchor.month, 1)
+    return start, end_excl
 
-    # Throughput + tech% (items reaching a Done-throughput status in window). When the
-    # team is worked_only, restrict to items that actually passed through a Doing status
-    # (excludes administrative straight-to-done closures), matching Nave's throughput.
-    tp_ids = ",".join(sorted(done_tp))
-    worked = f' AND status WAS IN ({doing_ids})' if cfg.get("worked_only") else ""
+def _doing_intervals(tr, doing, lo, hi):
+    """Total days (float) an issue spent in a Doing-category status within the
+    half-open window [lo, hi) (both timezone-aware datetimes), based on its sorted
+    (time, to_status_id) transition history `tr`. Handles issues that entered/left
+    Doing multiple times. The status held at `lo` (before any in-window transition)
+    is inferred from the last transition at or before `lo`."""
+    total = timedelta(0)
+    cur_doing = _status_at(tr, lo) in doing
+    seg_start = lo if cur_doing else None
+    for t, sid in tr:
+        if t <= lo or t >= hi:
+            continue
+        if cur_doing:
+            total += t - seg_start
+            cur_doing = False
+            seg_start = None
+        if sid in doing:
+            cur_doing = True
+            seg_start = t
+    if cur_doing:
+        total += hi - seg_start
+    return total.total_seconds() / 86400
+
+async def _avg_wip(conn, cfg, doing, month_start, month_end_excl, sem):
+    """Average WIP for a calendar month: (sum of ticket-days spent in a Doing status
+    during the month, across every ticket that touched Doing at all that month) /
+    (days in the month). Replaces the old report-date WIP snapshot + Red/Yellow/Green
+    aging buckets for calendar-month-FL1 realms."""
+    scope = cfg["fl1"]
+    doing_ids = ",".join(sorted(doing))
+    lo = datetime(month_start.year, month_start.month, month_start.day, tzinfo=timezone.utc)
+    hi = datetime(month_end_excl.year, month_end_excl.month, month_end_excl.day, tzinfo=timezone.utc)
+    last_day_incl = (month_end_excl - timedelta(days=1)).isoformat()
+    cand = _search_all(conn,
+        f'({scope}) AND issuetype in {FL1_TYPES} AND status WAS IN ({doing_ids}) '
+        f'DURING ("{month_start.isoformat()}","{last_day_incl}")',
+        ["id", "key"])
+    trs = await asyncio.gather(*[_transitions(conn, i["id"], sem) for i in cand])
+    days_in_month = (month_end_excl - month_start).days
+    if not days_in_month:
+        return None
+    total_ticket_days = sum(_doing_intervals(tr, doing, lo, hi) for tr in trs)
+    return round(total_ticket_days / days_in_month, 2)
+
+async def _fl1_window_metrics(conn, cfg, sem, doing, done, tp_ids, worked, start_s, end_s):
+    """Compute {tp_n, ct_p85, tech_pct, cts} for FL1 tasks within [start_s, end_s).
+    Extracted so the SAME logic can be run twice for calendar-month-FL1 realms (once
+    for the calendar-month chart-series window, once for the rolling-120-day KPI-
+    headline window) without duplicating the query/percentile logic. For non-
+    calendar-month realms (Core/Apps/Machine) this is called exactly once per team,
+    with byte-identical JQL/behavior to before this helper was extracted."""
+    scope = cfg["fl1"]
+    win = f'("{start_s}","{end_s}")'
     # Count each item's FIRST completion only: it must reach a Done-throughput status
     # DURING the window AND not have been in any terminal status before the window. This
     # immunises throughput against mass re-closures (e.g. FA/BMA Core's 23-Jul-2026 bulk
@@ -453,6 +519,53 @@ async def _fl1(conn, cfg, anchor, sem):
         if d0 and dn and dn >= d0:
             cts.append((dn - d0).total_seconds() / 86400)
     ct_p85 = round(np.percentile(cts, 85)) if cts else None
+    return tp_n, ct_p85, tech_pct, cts
+
+async def _fl1(conn, cfg, anchor, sem, realm="core"):
+    calendar_month = realm in REALM_CALENDAR_MONTH_FL1
+    scope = cfg["fl1"]; bugs_base = cfg["bugs"]
+    doing, done, done_tp, names = _fl1_buckets(conn, cfg["status_project"], cfg.get("done_extra"))
+    doing_ids = ",".join(sorted(doing))
+
+    # Throughput + tech% (items reaching a Done-throughput status in window). When the
+    # team is worked_only, restrict to items that actually passed through a Doing status
+    # (excludes administrative straight-to-done closures), matching Nave's throughput.
+    tp_ids = ",".join(sorted(done_tp))
+    worked = f' AND status WAS IN ({doing_ids})' if cfg.get("worked_only") else ""
+
+    if calendar_month:
+        month_start, month_end_excl = _calendar_month_bounds(anchor)
+        cal_start_s, cal_end_s = month_start.isoformat(), month_end_excl.isoformat()
+
+        # 1. Calendar-month figures -- these feed the monthly chart series.
+        tp_n, ct_p85, tech_pct, _cal_cts = await _fl1_window_metrics(
+            conn, cfg, sem, doing, done, tp_ids, worked, cal_start_s, cal_end_s)
+        bC = _count(conn, f'({bugs_base}) AND created >= "{cal_start_s}" AND created < "{cal_end_s}"')
+        bR = _count(conn, f'({bugs_base}) AND resolutiondate >= "{cal_start_s}" AND resolutiondate < "{cal_end_s}"')
+        wipAvg = await _avg_wip(conn, cfg, doing, month_start, month_end_excl, sem)
+
+        # 2. Rolling-120-day figures -- KPI-headline ONLY (never charted per calendar
+        # month). A single volatile calendar month must not drive the "how's this team
+        # doing right now" headline number, so the KPI cards show a genuine second
+        # rolling-120-day recompute (the same window/logic FL1 always used before this
+        # redesign) instead of an average of the monthly chart points -- averaging
+        # per-month 85th-percentile Cycle Times would NOT equal the true 85th percentile
+        # of the pooled 120-day population, so this must be a real second Jira query,
+        # confirmed with the user 2026-08-27.
+        roll_start_s, roll_end_s = _window(anchor)
+        tpRoll, ctRoll, techRoll, _roll_cts = await _fl1_window_metrics(
+            conn, cfg, sem, doing, done, tp_ids, worked, roll_start_s, roll_end_s)
+        wipAvgRoll = await _avg_wip(conn, cfg, doing, date.fromisoformat(roll_start_s),
+                                     date.fromisoformat(roll_end_s), sem)
+
+        return {"ct": ct_p85, "tp": tp_n, "wipAvg": wipAvg, "bC": bC, "bR": bR, "tech": tech_pct,
+                "ctRoll": ctRoll, "tpRoll": tpRoll, "wipAvgRoll": wipAvgRoll, "techRoll": techRoll}
+
+    # ── Non-calendar-month realms (Core/Apps/Machine): unchanged rolling-window-only
+    # behavior, byte-identical to before _fl1_window_metrics was extracted. ──
+    start_s, end_s = _window(anchor)
+    tp_n, ct_p85, tech_pct, cts = await _fl1_window_metrics(
+        conn, cfg, sem, doing, done, tp_ids, worked, start_s, end_s)
 
     # Bugs (from Jira, NOT Nave): created / resolved within window. bugs_base is already
     # restricted to bug issues (project+issuetype, or a dedicated saved filter).
@@ -569,7 +682,7 @@ async def _fl2(conn, cfg, anchor, sem, realm="core"):
 # ─── Orchestration ───────────────────────────────────────────────────────────────
 async def _compute_team(conn, cfg, anchor, sem, realm="core"):
     # FL1 and FL2 are independent — run them concurrently to cut wall-clock time.
-    fl1, fl2 = await asyncio.gather(_fl1(conn, cfg, anchor, sem),
+    fl1, fl2 = await asyncio.gather(_fl1(conn, cfg, anchor, sem, realm),
                                     _fl2(conn, cfg, anchor, sem, realm))
     return {"fl1": fl1, "fl2": fl2}
 
