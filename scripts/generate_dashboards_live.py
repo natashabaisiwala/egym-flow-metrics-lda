@@ -300,6 +300,13 @@ DESC_FL1=[
     ("✅ Higher = more tech investment","Share of throughput going to tech improvements. Growing = healthy long-term investment."),
     ("✅ Lower and stable = better","Total tasks in progress. High WIP slows everything — reducing it improves cycle time."),
 ]
+DESC_FL1_AVG_WIP=[
+    ("✅ Lower = better","How long a task takes start-to-done (85th pct). Falling trend = process getting faster."),
+    ("✅ Higher = better","Tasks completed in the calendar month. Look for stability or gradual growth."),
+    ("✅ Lower and stable = better","Mean number of tickets in progress on any given day this month (ticket-days ÷ days in month). High or rising = work is piling up faster than it's finishing."),
+    ("⚖️ Closed ≥ Reported = healthy","Bugs created/resolved this calendar month. If created consistently exceeds resolved, quality debt accumulates."),
+    ("✅ Higher = more tech investment","Share of throughput going to tech improvements. Growing = healthy long-term investment."),
+]
 DESC_FL2=[
     ("✅ Lower = better","How long epics take end-to-end (85th pct). Spikes often mean outlier epics in backlogs."),
     ("✅ Higher = better","Epics completed per month. Shows ability to close large initiatives."),
@@ -376,6 +383,44 @@ INSIGHTS = {
 #     extractable) ───────────────────────────────────────────────────────────
 WELLPASS_REALMS = set()  # Wellpass switched to the standard schema/template from Aug 25 onward;
                           # reduced-schema code paths kept below (unused, harmless) for reference.
+
+# Realms rendering FL1 with calendar-month population + a single Average WIP metric
+# instead of the report-date WIP snapshot + Red/Yellow/Green aging chart. Wellpass
+# only, starting with the Aug 2026 report. Deliberately a SEPARATE set from the dead
+# WELLPASS_REALMS above -- never add wellpass to WELLPASS_REALMS itself, that flag
+# drives the old wipAge/tpYTD dead schema, not this one.
+REALM_AVG_WIP_FL1 = {"wellpass"}
+
+WELLPASS_AVG_WIP_ABOUT_BLOCK=(
+    '<div style="margin-bottom:24px;padding:18px 20px;background:#0c1628;border:1px solid #1e2540;border-radius:10px">'
+    '<h2 style="font-size:.85rem;font-weight:700;padding-left:10px;border-left:3px solid #60a5fa;margin:0 0 12px">About Flow Metrics</h2>'
+    '<p style="font-size:.72rem;color:#7a87a0;line-height:1.6;margin-bottom:12px">'
+    '<strong style="color:#e4eaf5">Disclaimer:</strong> All metrics besides WIP and WIP risks are lagging indicators. '
+    'WIP and WIP Risk are leading indicators that we can actively manage right now. '
+    'Doing so can bring positive trends across all metrics in the future.</p>'
+    '<p style="font-size:.72rem;color:#7a87a0;line-height:1.6;margin-bottom:16px">'
+    '<strong style="color:#e4eaf5">📊 Two different windows in this report:</strong> FL1 (Tasks) charts show '
+    'calendar-month data — each monthly point reflects only the work done in that specific month, so figures are '
+    'not smoothed and can move more sharply month to month than a rolling-window report would; that variation is '
+    'real, not noise. FL2 (Epics) charts still use a rolling 120-day window: each report covers the last 4 months, '
+    'not a single calendar month, and consecutive reports overlap by ~85 days, which smooths month-to-month '
+    'figures — a single anomaly can influence 2–3 consecutive data points rather than just one.</p>'
+    '<div style="font-size:.72rem;font-weight:700;color:#e4eaf5;margin-bottom:10px">Flight Levels</div>'
+    '<div style="display:flex;flex-wrap:wrap;gap:14px">'
+      '<div style="flex:1 1 28%;min-width:220px">'
+        '<div style="font-size:.71rem;font-weight:700;color:#a78bfa;margin-bottom:4px">FL1 — Operation</div>'
+        '<div style="font-size:.7rem;color:#7a87a0;line-height:1.55">Represented by daily-basis team\'s work items where the focus is on delivery, the work is connected with the second level, the Epics.</div>'
+      '</div>'
+      '<div style="flex:1 1 28%;min-width:220px">'
+        '<div style="font-size:.71rem;font-weight:700;color:#60a5fa;margin-bottom:4px">FL2 — Coordination</div>'
+        '<div style="font-size:.7rem;color:#7a87a0;line-height:1.55">Where the focus is on coordinate roadmap and tech initiatives, Epics management (Jira FL2 board) and cross-team alignment.</div>'
+      '</div>'
+      '<div style="flex:1 1 28%;min-width:220px">'
+        '<div style="font-size:.71rem;font-weight:700;color:#22c55e;margin-bottom:4px">FL3 — Strategy</div>'
+        '<div style="font-size:.7rem;color:#7a87a0;line-height:1.55">At the top EGYM\'s strategy, where the focus is on the goals, direction and priorities of the company.</div>'
+      '</div>'
+    '</div></div>'
+)
 
 WELLPASS_ABOUT_BLOCK=(
     '<div style="margin-bottom:24px;padding:18px 20px;background:#0c1628;border:1px solid #1e2540;border-radius:10px">'
@@ -454,7 +499,7 @@ def wellpass_snapshot(f1, f2):
     }
 
 # ─── Realm-level aggregation (for the realm dashboard) ─────────────────────────
-def aggregate_realm_fl(realm, fl_key, wellpass=False):
+def aggregate_realm_fl(realm, fl_key, wellpass=False, avg_wip=False):
     """Aggregate every team's fl1/fl2 arrays in a realm into one realm-level dict,
     for the realm dashboard. Rate-like fields (Cycle Time, Tech %, WIP Age) are
     averaged across teams that have a value that month. Volume-like fields
@@ -474,6 +519,15 @@ def aggregate_realm_fl(realm, fl_key, wellpass=False):
         avg_keys = ['wipAge']
         sum_keys = ['wip', 'tpYTD', 'bC', 'bR'] if fl_key == 'fl1' else ['wip']
         weight_key = None
+    elif avg_wip and fl_key == 'fl1':
+        # Calendar-month-FL1 realms (Wellpass): Average WIP replaces wR/wY/wG entirely.
+        # ctRoll/wipAvgRoll/tpRoll/techRoll are the rolling-120-day KPI-headline
+        # counterparts (see _fl1() / snapshot_avg_wip()) -- aggregated here the same
+        # way as their calendar-month siblings so the realm-level KPI cards (which
+        # also call snapshot_avg_wip) have the fields they need.
+        avg_keys = ['ct', 'wipAvg', 'ctRoll', 'wipAvgRoll']
+        sum_keys = ['tp', 'bC', 'bR', 'tpRoll']
+        weight_key = 'tp'
     else:
         avg_keys = ['ct']  # tech is handled separately below as a volume-weighted average
         sum_keys = (['tp', 'wR', 'wY', 'wG', 'bC', 'bR'] if fl_key == 'fl1'
@@ -485,7 +539,8 @@ def aggregate_realm_fl(realm, fl_key, wellpass=False):
         for i in range(n):
             vals = [t[fl_key][k][i] for t in teams
                     if t[fl_key].get(k) and i < len(t[fl_key][k]) and t[fl_key][k][i] is not None]
-            col.append(round(sum(vals)/len(vals)) if vals else None)
+            col.append((round(sum(vals)/len(vals), 2) if k in ('wipAvg', 'wipAvgRoll')
+                        else round(sum(vals)/len(vals))) if vals else None)
         out[k] = col
     for k in sum_keys:
         col = []
@@ -499,18 +554,24 @@ def aggregate_realm_fl(realm, fl_key, wellpass=False):
         # for FL2) so a team that delivered more work influences the realm figure more than
         # a small team — this approximates "what share of all realm work was tech" rather
         # than treating every team's percentage as equally important regardless of volume.
-        tech_col = []
-        for i in range(n):
-            pairs = [(t[fl_key]['tech'][i], t[fl_key][weight_key][i]) for t in teams
-                     if t[fl_key].get('tech') and i < len(t[fl_key]['tech']) and t[fl_key]['tech'][i] is not None
-                     and t[fl_key].get(weight_key) and i < len(t[fl_key][weight_key]) and t[fl_key][weight_key][i] is not None]
-            if not pairs:
-                tech_col.append(None)
-            else:
-                wsum = sum(w for _, w in pairs)
-                tech_col.append(round(sum(v*w for v, w in pairs)/wsum) if wsum > 0
-                                 else round(sum(v for v, _ in pairs)/len(pairs)))
-        out['tech'] = tech_col
+        def _weighted_tech(tech_key, wt_key):
+            col = []
+            for i in range(n):
+                pairs = [(t[fl_key][tech_key][i], t[fl_key][wt_key][i]) for t in teams
+                         if t[fl_key].get(tech_key) and i < len(t[fl_key][tech_key]) and t[fl_key][tech_key][i] is not None
+                         and t[fl_key].get(wt_key) and i < len(t[fl_key][wt_key]) and t[fl_key][wt_key][i] is not None]
+                if not pairs:
+                    col.append(None)
+                else:
+                    wsum = sum(w for _, w in pairs)
+                    col.append(round(sum(v*w for v, w in pairs)/wsum) if wsum > 0
+                               else round(sum(v for v, _ in pairs)/len(pairs)))
+            return col
+        out['tech'] = _weighted_tech('tech', weight_key)
+        if avg_wip and fl_key == 'fl1':
+            # techRoll (rolling-120-day KPI-headline tech %) weighted by tpRoll,
+            # mirroring how the calendar-month 'tech' is weighted by 'tp'.
+            out['techRoll'] = _weighted_tech('techRoll', 'tpRoll')
     return out
 
 MACHINE_WIP_CAVEAT = (
@@ -537,6 +598,22 @@ def fl1_set(months, d, color):
         area_chart (months,wip,      color,   'WIP Snapshot (Report Date)', '',              sts[5]),
     ]
     return list(zip(charts, DESC_FL1, sts))
+
+def fl1_set_avg_wip(months, d, color):
+    """Fork of fl1_set() for REALM_AVG_WIP_FL1 realms (Wellpass): replaces the
+    'WIP by Status' (RYG) chart and the 'WIP Snapshot (Report Date)' chart with a
+    single Average WIP chart. 5 charts total instead of 6."""
+    months, d = _filter_none(months, d)
+    sts=[trend(d['ct'],True), trend(d['tp'],False), trend(d['wipAvg'],True),
+         trend_bugs(d['bC'],d['bR']), trend(d['tech'],False)]
+    charts=[
+        line_chart (months,d['ct'],    color,    'Cycle Time 85th pct', 'days',                            sts[0]),
+        bar_chart  (months,d['tp'],    color,    'Throughput',          'tasks / calendar month',          sts[1]),
+        area_chart (months,d['wipAvg'],color,    'Average WIP',         'mean tickets in progress / day',  sts[2]),
+        grouped_bar(months,d['bC'],d['bR'],'Closed','Reported','#22c55e','#ef4444','Bugs','',               sts[3]),
+        line_chart (months,d['tech'],  '#a78bfa','Tech %',              'of throughput',                   sts[4]),
+    ]
+    return list(zip(charts, DESC_FL1_AVG_WIP, sts))
 
 def fl2_set(months, d, color):
     months, d = _filter_none(months, d)
@@ -574,6 +651,35 @@ def snapshot(f1, f2, n):
         'del_': f"{ldel}{d(ldel,prev(f2['del']),False)}" if ldel is not None else '—',
         'tech': f"{ltech}%" if ltech is not None else '—',
         'wip2': lwip2 if lwip2 is not None else 0,
+    }
+
+def snapshot_avg_wip(f1, f2, n):
+    """Fork of snapshot() for REALM_AVG_WIP_FL1 realms (Wellpass): the FL1 KPI-headline
+    cards (Cycle Time, Throughput, Average WIP, Tech %) show the rolling-120-day
+    recompute (ctRoll/tpRoll/wipAvgRoll/techRoll) -- NOT the calendar-month values used
+    by the charts elsewhere on the page. A single volatile calendar month must not
+    drive the headline "how's this team doing" number (e.g. one unusually fast month
+    after three slow ones would otherwise make the team look healthier than it is), so
+    the KPI cards intentionally show the smoothed rolling-120-day figure instead.
+    Confirmed with the user 2026-08-27. FL1 charts still plot calendar-month
+    ct/tp/wipAvg/tech per month, unchanged."""
+    def d(c,p,lb=None):
+        if p is None or c is None or c==p: return ''
+        return f' ↓{abs(c-p)}' if c < p else f' ↑{abs(c-p)}'
+    def last(a): return next((v for v in reversed(a) if v is not None), None)
+    def prev(a):
+        nn=[v for v in a if v is not None]
+        return nn[-2] if len(nn)>=2 else None
+    lct1=last(f1['ctRoll']); ltp=last(f1['tpRoll']); lwipAvg=last(f1['wipAvgRoll'])
+    lct2=last(f2['ct']); ldel=last(f2['del']); ltech=last(f1['techRoll']); lwip2=last(f2['wip'])
+    return {
+        'ct1':    f"{lct1}d{d(lct1,prev(f1['ctRoll']),True)}" if lct1 is not None else '—',
+        'tp':     f"{ltp}{d(ltp,prev(f1['tpRoll']),False)}" if ltp is not None else '—',
+        'wipAvg': f"{lwipAvg:g}" if lwipAvg is not None else '—',
+        'ct2':    f"{lct2}d{d(lct2,prev(f2['ct']),True)}" if lct2 is not None else '—',
+        'del_':   f"{ldel}{d(ldel,prev(f2['del']),False)}" if ldel is not None else '—',
+        'tech':   f"{ltech}%" if ltech is not None else '—',
+        'wip2':   lwip2 if lwip2 is not None else 0,
     }
 
 # ─── HTML builders ─────────────────────────────────────────────────────────────
@@ -653,6 +759,7 @@ def _team_fl2(realm, team):
 def team_html(realm_id, realm_name, team_id, team, months, fl2_data=None):
     c = team['color']
     wellpass = realm_id in WELLPASS_REALMS
+    avg_wip = realm_id in REALM_AVG_WIP_FL1
 
     if wellpass:
         s = wellpass_snapshot(team['fl1'], team['fl2'])
@@ -667,6 +774,21 @@ def team_html(realm_id, realm_name, team_id, team, months, fl2_data=None):
   <div class="kpi"><div class="lbl">Bugs Created/Resolved</div><div class="val">{s['bugs']}</div></div>
   <div class="kpi"><div class="lbl">Epic WIP</div><div class="val">{s['wip2']}</div></div>
   <div class="kpi"><div class="lbl">Epic WIP Avg Age</div><div class="val">{s['wipAge2']}</div></div>"""
+    elif avg_wip:
+        _fl2 = fl2_data if fl2_data is not None else (team.get('fl2') or {})
+        s = snapshot_avg_wip(team['fl1'], _fl2, len(months))
+        fl1 = fl1_set_avg_wip(months, team['fl1'], c)
+        fl2 = fl2_set(months, _fl2, c)
+        about = WELLPASS_AVG_WIP_ABOUT_BLOCK
+        kpi_cols = 7
+        kpi_row = f"""
+  <div class="kpi"><div class="lbl">FL1 Cycle Time</div><div class="val">{s['ct1']}</div></div>
+  <div class="kpi"><div class="lbl">FL1 Throughput</div><div class="val">{s['tp']}</div></div>
+  <div class="kpi"><div class="lbl">FL1 Average WIP</div><div class="val">{s['wipAvg']}</div></div>
+  <div class="kpi"><div class="lbl">FL2 Cycle Time</div><div class="val">{s['ct2']}</div></div>
+  <div class="kpi"><div class="lbl">FL2 Delivered</div><div class="val">{s['del_']}</div></div>
+  <div class="kpi"><div class="lbl">FL2 WIP</div><div class="val">{s['wip2']}</div></div>
+  <div class="kpi"><div class="lbl">Tech %</div><div class="val">{s['tech']}</div></div>"""
     else:
         _fl2 = fl2_data if fl2_data is not None else (team.get('fl2') or {})
         s = snapshot(team['fl1'], _fl2, len(months))
@@ -836,14 +958,15 @@ def realm_index_html(realm_id, realm):
 
 def realm_dashboard_html(realm_id, realm):
     wellpass = realm_id in WELLPASS_REALMS
+    avg_wip = realm_id in REALM_AVG_WIP_FL1
     c = '#60a5fa'
     months = realm['months']
     n_teams = len(realm['teams'])
     start = months[0] if months else '—'
     end = months[-1] if months else '—'
 
-    agg_fl1 = aggregate_realm_fl(realm, 'fl1', wellpass)
-    agg_fl2 = aggregate_realm_fl(realm, 'fl2', wellpass)
+    agg_fl1 = aggregate_realm_fl(realm, 'fl1', wellpass, avg_wip)
+    agg_fl2 = aggregate_realm_fl(realm, 'fl2', wellpass, avg_wip)
 
     if wellpass:
         s = wellpass_snapshot(agg_fl1, agg_fl2)
@@ -862,6 +985,31 @@ def realm_dashboard_html(realm_id, realm):
                     'across teams with data each month. WIP, Throughput, and Bugs are summed across teams '
                     'with data each month (realm-wide totals). Teams with no data for a given month are '
                     'excluded from that month\'s calculation rather than counted as zero.</p>')
+    elif avg_wip:
+        s = snapshot_avg_wip(agg_fl1, agg_fl2, len(months))
+        fl1 = fl1_set_avg_wip(months, agg_fl1, c)
+        fl2 = fl2_set(months, agg_fl2, c)
+        about = WELLPASS_AVG_WIP_ABOUT_BLOCK
+        kpi_cols = 7
+        kpi_row = f"""
+  <div class="kpi"><div class="lbl">Avg FL1 Cycle Time</div><div class="val">{s['ct1']}</div></div>
+  <div class="kpi"><div class="lbl">Total FL1 Throughput</div><div class="val">{s['tp']}</div></div>
+  <div class="kpi"><div class="lbl">Realm Average FL1 WIP</div><div class="val">{s['wipAvg']}</div></div>
+  <div class="kpi"><div class="lbl">Avg FL2 Cycle Time</div><div class="val">{s['ct2']}</div></div>
+  <div class="kpi"><div class="lbl">Total FL2 Delivered</div><div class="val">{s['del_']}</div></div>
+  <div class="kpi"><div class="lbl">Total FL2 WIP</div><div class="val">{s['wip2']}</div></div>
+  <div class="kpi"><div class="lbl">Avg Tech %</div><div class="val">{s['tech']}</div></div>"""
+        agg_note = ('<div style="background:#0c1628;border:1px solid #2f261a;border-left:3px solid #f59e0b;'
+                    'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px">'
+                    '<p style="font-size:.72rem;color:#7a87a0;line-height:1.6">'
+                    '<strong style="color:#e4eaf5">📐 How these numbers are built:</strong> FL1 Throughput and Bugs are '
+                    '<strong style="color:#e4eaf5">summed</strong> across teams with data each month (true realm-wide '
+                    'totals). FL1 Cycle Time and Average WIP are <strong style="color:#e4eaf5">simple averages</strong> '
+                    'of each team\'s own monthly figure — teams with no data for a given month are excluded from that '
+                    'month\'s calculation rather than counted as zero. Tech % is a '
+                    '<strong style="color:#e4eaf5">throughput-weighted average</strong> (teams that delivered more '
+                    'work count more), approximating "what share of all realm work was tech" rather than treating '
+                    'every team\'s percentage as equally important regardless of volume.</p></div>')
     else:
         s = snapshot(agg_fl1, agg_fl2, len(months))
         fl1 = fl1_set(months, agg_fl1, c)
