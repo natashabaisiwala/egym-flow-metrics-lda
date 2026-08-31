@@ -636,7 +636,12 @@ def snapshot(f1, f2, n):
         # independent of whether that direction is "good" or "bad" for this metric — the lb
         # parameter is accepted for call-site compatibility but intentionally unused here.
         if p is None or c is None or c==p: return ''
-        return f' ↓{abs(c-p)}' if c < p else f' ↑{abs(c-p)}'
+        # Round before display so float-valued series (e.g. Average WIP) never leak
+        # binary floating-point subtraction artifacts like "0.29999999999998" into
+        # the rendered trend arrow. Cosmetic-only: identical output for int series
+        # (round(int,2) is a no-op and f"{n:g}" formats an int the same as str(n)).
+        diff = round(abs(c-p), 2)
+        return f' ↓{diff:g}' if c < p else f' ↑{diff:g}'
     def last(a): return next((v for v in reversed(a) if v is not None), None)
     def prev(a):
         nn=[v for v in a if v is not None]
@@ -665,7 +670,12 @@ def snapshot_avg_wip(f1, f2, n):
     ct/tp/wipAvg/tech per month, unchanged."""
     def d(c,p,lb=None):
         if p is None or c is None or c==p: return ''
-        return f' ↓{abs(c-p)}' if c < p else f' ↑{abs(c-p)}'
+        # Round before display so float-valued series (e.g. Average WIP) never leak
+        # binary floating-point subtraction artifacts like "0.29999999999998" into
+        # the rendered trend arrow. Cosmetic-only: identical output for int series
+        # (round(int,2) is a no-op and f"{n:g}" formats an int the same as str(n)).
+        diff = round(abs(c-p), 2)
+        return f' ↓{diff:g}' if c < p else f' ↑{diff:g}'
     def last(a): return next((v for v in reversed(a) if v is not None), None)
     def prev(a):
         nn=[v for v in a if v is not None]
@@ -1191,7 +1201,10 @@ def fmt_last_delta(arr, lower_is_better, suffix=''):
     if c is None: return '—'
     if p is None or c == p: return f"{c}{suffix}"
     arrow = '↓' if c < p else '↑'
-    return f"{c}{suffix} {arrow}{abs(c-p)}"
+    # Round before display -- see snapshot()/snapshot_avg_wip()'s d() helper for why
+    # (avoids floating-point subtraction artifacts on any float-valued series).
+    diff = round(abs(c-p), 2)
+    return f"{c}{suffix} {arrow}{diff:g}"
 
 def metric_row(label, value, st):
     return (f'<div style="display:flex;justify-content:space-between;align-items:center;'
