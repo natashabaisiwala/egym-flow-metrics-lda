@@ -222,11 +222,21 @@ def _realm_fl2_doing(realm):
 # XT-2258 "Quarterly Gameday Events for EoS Fitness...". Confirmed by Bruno
 # Farace, 2026-08-31. Additive only: every other realm defaults to no exclusion
 # label, so their behavior stays byte-identical.
+# IMPORTANT JQL gotcha (caught 2026-08-31 during verification): a plain
+# `labels != "X"` clause silently drops every issue that has NO labels at all --
+# Jira's "!=" operator does not match empty/null fields. Without the explicit
+# `OR labels is EMPTY`, this wrongly excluded real, unrelated delivered epics
+# with no labels (e.g. BMACG-203, BMACG-117) from BMA Core Growth / Engagement
+# FL2 counts, even though they never carried "#ignore_nave". Verified fixed:
+# an isolated before/after re-run with this corrected clause shows ZERO change
+# for bma_core_growth / bma_engagement FL2 (matches the diagnostic search
+# confirming no #ignore_nave-labeled epics exist in their scope), while
+# trainer / workout FL2 still change exactly as expected (MA-4147, XT-2258).
 REALM_FL2_LABEL_EXCLUDE = {"apps": "#ignore_nave"}
 
 def _realm_fl2_label_clause(realm):
     lbl = REALM_FL2_LABEL_EXCLUDE.get(realm)
-    return f' AND labels != "{lbl}"' if lbl else ""
+    return f' AND (labels != "{lbl}" OR labels is EMPTY)' if lbl else ""
 
 # Tech = customfield_10463 (Tech Task dropdown) value in {Technical Task, Security Task}.
 # customfield_11502 (Tech Roadmap) is intentionally NOT used: verified Jul 2026 that
