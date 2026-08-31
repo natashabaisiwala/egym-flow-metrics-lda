@@ -774,21 +774,55 @@ def team_html(realm_id, realm_name, team_id, team, months, fl2_data=None):
   <div class="kpi"><div class="lbl">Bugs Created/Resolved</div><div class="val">{s['bugs']}</div></div>
   <div class="kpi"><div class="lbl">Epic WIP</div><div class="val">{s['wip2']}</div></div>
   <div class="kpi"><div class="lbl">Epic WIP Avg Age</div><div class="val">{s['wipAge2']}</div></div>"""
+        group_css = ""
+        kpi_block = f'<div class="kpi-row">{kpi_row}\n</div>'
     elif avg_wip:
         _fl2 = fl2_data if fl2_data is not None else (team.get('fl2') or {})
         s = snapshot_avg_wip(team['fl1'], _fl2, len(months))
         fl1 = fl1_set_avg_wip(months, team['fl1'], c)
         fl2 = fl2_set(months, _fl2, c)
         about = WELLPASS_AVG_WIP_ABOUT_BLOCK
-        kpi_cols = 7
-        kpi_row = f"""
-  <div class="kpi"><div class="lbl">FL1 Cycle Time</div><div class="val">{s['ct1']}</div></div>
-  <div class="kpi"><div class="lbl">FL1 Throughput</div><div class="val">{s['tp']}</div></div>
-  <div class="kpi"><div class="lbl">FL1 Average WIP</div><div class="val">{s['wipAvg']}</div></div>
-  <div class="kpi"><div class="lbl">FL2 Cycle Time</div><div class="val">{s['ct2']}</div></div>
-  <div class="kpi"><div class="lbl">FL2 Delivered</div><div class="val">{s['del_']}</div></div>
-  <div class="kpi"><div class="lbl">FL2 WIP</div><div class="val">{s['wip2']}</div></div>
-  <div class="kpi"><div class="lbl">Tech %</div><div class="val">{s['tech']}</div></div>"""
+        kpi_cols = 7  # unused by this branch's rendering (kept for f-string compat); see kpi_block
+        kpi_row = ""  # unused for this branch; kpi_block below fully replaces the flat kpi-row
+        # Grouped KPI-card layout (FL1 green box / FL2 blue box) approved 2026-08-31,
+        # per the reviewed KPI Grouping Mockup v2. Scoped to REALM_AVG_WIP_FL1 (Wellpass)
+        # team pages only -- Core/Apps/Machine/split-realm pages keep the flat kpi-row.
+        group_css = """
+.kpi-groups{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.kpi-group{flex:1 1 380px;background:#0c1628;border:1px solid #1e2540;border-radius:12px;padding:14px 16px 16px}
+.kpi-group-label{display:flex;align-items:center;gap:7px;font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px}
+.kpi-group-label .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.kpi-group-sub{font-size:.66rem;font-weight:400;text-transform:none;letter-spacing:0;margin:0 0 10px 14px;opacity:.85}
+.fl1-group .kpi-group-label,.fl1-group .kpi-group-sub{color:#22c55e}
+.fl2-group .kpi-group-label,.fl2-group .kpi-group-sub{color:#60a5fa}
+.kpi-group-row{display:grid;gap:10px}
+.fl1-group .kpi-group-row{grid-template-columns:repeat(4,1fr)}
+.fl2-group .kpi-group-row{grid-template-columns:repeat(3,1fr)}
+.fl1-group .kpi{border-top:3px solid #22c55e}
+.fl2-group .kpi{border-top:3px solid #60a5fa}
+"""
+        kpi_block = f"""
+<div class="kpi-groups">
+  <div class="kpi-group fl1-group">
+    <div class="kpi-group-label"><span class="dot"></span>FL1 — Tasks</div>
+    <div class="kpi-group-sub">KPI cards below: 120-day rolling average (smoothed) · monthly charts further down the page</div>
+    <div class="kpi-group-row">
+      <div class="kpi"><div class="lbl">Cycle Time (120d)</div><div class="val">{s['ct1']}</div></div>
+      <div class="kpi"><div class="lbl">Throughput (120d)</div><div class="val">{s['tp']}</div></div>
+      <div class="kpi"><div class="lbl">Average WIP (120d)</div><div class="val">{s['wipAvg']}</div></div>
+      <div class="kpi"><div class="lbl">Tech % (120d)</div><div class="val">{s['tech']}</div></div>
+    </div>
+  </div>
+  <div class="kpi-group fl2-group">
+    <div class="kpi-group-label"><span class="dot"></span>FL2 — Epics</div>
+    <div class="kpi-group-sub">Rolling 120-day window (unchanged from today)</div>
+    <div class="kpi-group-row">
+      <div class="kpi"><div class="lbl">Cycle Time</div><div class="val">{s['ct2']}</div></div>
+      <div class="kpi"><div class="lbl">Delivered</div><div class="val">{s['del_']}</div></div>
+      <div class="kpi"><div class="lbl">WIP</div><div class="val">{s['wip2']}</div></div>
+    </div>
+  </div>
+</div>"""
     else:
         _fl2 = fl2_data if fl2_data is not None else (team.get('fl2') or {})
         s = snapshot(team['fl1'], _fl2, len(months))
@@ -804,6 +838,8 @@ def team_html(realm_id, realm_name, team_id, team, months, fl2_data=None):
   <div class="kpi"><div class="lbl">FL2 Delivered</div><div class="val">{s['del_']}</div></div>
   <div class="kpi"><div class="lbl">FL2 WIP</div><div class="val">{s['wip2']}</div></div>
   <div class="kpi"><div class="lbl">Tech %</div><div class="val">{s['tech']}</div></div>"""
+        group_css = ""
+        kpi_block = f'<div class="kpi-row">{kpi_row}\n</div>'
 
     fl2_section = ('<div style="margin-top:32px"><h2>FL2 — Epics</h2>'
                    + METHODOLOGY + chart_grid(fl2) + '</div>')
@@ -828,6 +864,7 @@ h1{{font-size:1.45rem;font-weight:800;letter-spacing:-.03em}}
 h2{{font-size:.95rem;font-weight:700;padding-left:10px;border-left:3px solid {c};margin:24px 0 10px}}
 footer{{margin-top:24px;padding-top:14px;border-top:1px solid #1e2540;font-size:.7rem;color:#4a5568;text-align:center}}
 a{{color:{c};text-decoration:none}}
+{group_css}
 </style>
 </head>
 <body>
@@ -835,8 +872,7 @@ a{{color:{c};text-decoration:none}}
 <div class="sub">Flow Metrics · {start} → {end} · {len(months)} months of data</div>
 {team_notes_html(team)}
 {about}
-<div class="kpi-row">{kpi_row}
-</div>
+{kpi_block}
 {ins}
 <div><h2>FL1 — Tasks</h2>{METHODOLOGY}{chart_grid(fl1)}</div>
 {fl2_section}
