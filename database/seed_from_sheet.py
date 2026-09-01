@@ -13,12 +13,27 @@ def get_sheet_data():
         print("Error: MAPPING_WEB_APP_URL is missing from .env")
         return []
 
-    response = requests.get(BASE_URL, allow_redirects=True)
-    response.raise_for_status()
-    data = response.json()
+    try:
+        response = requests.get(BASE_URL, allow_redirects=True, timeout=15)
+        response.raise_for_status()
+        data = response.json()
 
-    if isinstance(data, list):
-        return [row for row in data if isinstance(row, dict)]
+        # Unwrap top-level dictionary structures (e.g., {"data": [...]} or multi-tab payloads)
+        if isinstance(data, dict):
+            if "data" in data and isinstance(data["data"], list):
+                data = data["data"]
+            else:
+                flat_rows = []
+                for val in data.values():
+                    if isinstance(val, list):
+                        flat_rows.extend(val)
+                data = flat_rows
+
+        if isinstance(data, list):
+            return [row for row in data if isinstance(row, dict)]
+    except Exception as e:
+        print(f"Error fetching sheet data: {e}")
+    
     return []
 
 def seed_registry():
@@ -32,9 +47,8 @@ def seed_registry():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Drop legacy schema to ensure new columns ('source', 'updated_at') exist
+    # Re-initialize tables cleanly
     cursor.execute("DROP TABLE IF EXISTS service_realm_registry;")
-    
     cursor.execute("""
         CREATE TABLE service_realm_registry (
             service_name VARCHAR(100) PRIMARY KEY,
@@ -45,12 +59,24 @@ def seed_registry():
         );
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS realms_teams (
+            realm_name VARCHAR(100),
+            team_name VARCHAR(100),
+            PRIMARY KEY (realm_name, team_name)
+        );
+    """)
+
     seeded_count = 0
     for row in rows:
-        service = row.get("Service Name") or row.get("service_name") or row.get("Service") or row.get("Services")
-        realm = row.get("Realm Name") or row.get("realm_name") or row.get("Realm") or row.get("Realms")
-        team = row.get("Team Name") or row.get("team_name") or row.get("Team") or row.get("Teams")
-
+        # Normalize keys by stripping spaces, underscores, and lowercasing
+        norm_row = {str(k).strip().lower().replace(" ", "").replace("_", ""): str(v).strip() for k, v in row.items() if v is not None}
+        
+        # Matches 'Service Inventory' across all tabs, with fallbacks for alternative headers
+        service = norm_row.get("serviceinventory") or norm_row.get("servicename") or norm_row.get("service")
+        team = norm_row.get("team") or norm_row.get("teams") or norm_row.get("teamname")
+        realm = norm_row.get("realm") or norm_row.get("realms") or norm_row.get("realmname")
+        
         if not service and team:
             service = team
 
@@ -64,6 +90,13 @@ def seed_registry():
                     updated_at = CURRENT_TIMESTAMP
             """, (str(service).strip(), str(realm).strip(), str(team or 'Unassigned').strip()))
             seeded_count += 1
+
+        # Seed distinct realm-to-team relationships for dashboard headers
+        if realm and team and team.lower() != 'unassigned':
+            cursor.execute("""
+                INSERT OR IGNORE INTO realms_teams (realm_name, team_name)
+                VALUES (?, ?)
+            """, (str(realm).strip(), str(team).strip()))
 
     conn.commit()
     conn.close()

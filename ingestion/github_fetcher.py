@@ -7,19 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Environment credentials & endpoints
 SERVICE_INVENTORY_URL = os.getenv("SERVICE_INVENTORY_URL")
-SERVICE_INVENTORY_API_KEY = os.getenv("SERVICE_INVENTORY_API_KEY")
-
-DEFAULT_USER = "natasha.baisiwala"
-SERVICE_INVENTORY_USER = os.getenv("SERVICE_INVENTORY_USER", DEFAULT_USER)
-if "@" in SERVICE_INVENTORY_USER:
-    SERVICE_INVENTORY_USER = SERVICE_INVENTORY_USER.split("@")[0]
+SERVICE_INVENTORY_API_KEY = os.getenv("SERVICE_INVENTORY_API_KEY", "").strip("'\" ")
 
 DB_PATH = os.path.join("database", "dora_metrics.db")
 EXPORT_CSV_PATH = "inspected_service_inventory.csv"
 
-# Cutoff start date for DORA metrics baseline
 START_DATE_CUTOFF = "2024-01-01"
 
 def init_raw_service_inventory_table(cursor):
@@ -57,13 +50,14 @@ def export_service_inventory_to_csv(cursor):
     print(f"Exported {len(rows)} records (2024-01-01 onwards in DD.MM.YYYY format) to {EXPORT_CSV_PATH}!")
 
 def fetch_and_store_sre_deployments():
-    """Fetches full SRE deployments logbook, filtering >= 2024-01-01 and formatting dates as DD.MM.YYYY."""
+    """Fetches full SRE deployments logbook matching official SRE workflow."""
     if not SERVICE_INVENTORY_URL or not SERVICE_INVENTORY_API_KEY:
         print("Error: SERVICE_INVENTORY_URL or SERVICE_INVENTORY_API_KEY is missing from environment.")
         return
 
     base_url = SERVICE_INVENTORY_URL.rstrip('/')
-    endpoint_url = f"{base_url}/api/deployments"
+    # SRE Workflow exact endpoint: /api/deployments/recent/999 (covers ~3 years of historical deployments)
+    endpoint_url = f"{base_url}/api/deployments/recent/999"
     print(f"Fetching SRE deployment logbook from {endpoint_url} (Filtering >= {START_DATE_CUTOFF})...")
 
     conn = sqlite3.connect(DB_PATH)
@@ -71,17 +65,15 @@ def fetch_and_store_sre_deployments():
 
     try:
         init_raw_service_inventory_table(cursor)
-        
-        # Clear existing table to remove legacy pre-2024 rows
         cursor.execute("DELETE FROM service_inventory_raw")
 
-        # Primary authentication attempt using natasha.baisiwala
-        auth = HTTPBasicAuth(SERVICE_INVENTORY_USER, SERVICE_INVENTORY_API_KEY)
+        # Try personal user auth first (for local execution)
+        local_user = os.getenv("SERVICE_INVENTORY_USER", "natasha.baisiwala")
+        auth = HTTPBasicAuth(local_user, SERVICE_INVENTORY_API_KEY)
         res = requests.get(endpoint_url, auth=auth, timeout=60)
-        
-        # Fallback to githubactions if primary user returns 401
-        if res.status_code == 401 and SERVICE_INVENTORY_USER != "githubactions":
-            print("Notice: Primary user auth returned 401, trying 'githubactions'...")
+
+        # Fallback to the SRE service account (for automated GitHub Actions runs)
+        if res.status_code == 401:
             auth = HTTPBasicAuth("githubactions", SERVICE_INVENTORY_API_KEY)
             res = requests.get(endpoint_url, auth=auth, timeout=60)
 
@@ -91,7 +83,7 @@ def fetch_and_store_sre_deployments():
 
         raw_deployments = res.json()
 
-        # Filter criteria: environment == production, non-null endTime, date >= 2024-01-01
+        # Filter criteria matching SRE jq pipeline: environment == production and non-null endTime
         filtered_deployments = []
         for item in raw_deployments:
             if item.get("environment") != "production" or not item.get("endTime"):
@@ -100,11 +92,9 @@ def fetch_and_store_sre_deployments():
             end_time_str = str(item.get("endTime"))
             iso_date = end_time_str[:10]  # YYYY-MM-DD
             
-            # Enforce Jan 1, 2024 cutoff
             if iso_date >= START_DATE_CUTOFF:
                 filtered_deployments.append((item, iso_date))
 
-        # Sort chronologically by endTime
         filtered_deployments.sort(key=lambda x: str(x[0].get("endTime")))
 
         total_processed = 0
@@ -113,14 +103,12 @@ def fetch_and_store_sre_deployments():
             if not service_name:
                 continue
 
-            # Format date as DD.MM.YYYY matching reference Google Sheet
             deployment_date_euro = format_date_to_european(iso_date)
 
-            # Evaluate Rollout Success: TRUE if not rollback, FALSE if rollback
+            # SRE logic: (.rollback | not) -> True if NOT rollback, False if rollback
             is_rollback = bool(item.get("rollback", False))
             rollout_success = "FALSE" if is_rollback else "TRUE"
 
-            # Primary key for database deduplication
             deployment_id = f"sre_{service_name}_{item.get('endTime')}"
 
             cursor.execute("""
@@ -131,9 +119,8 @@ def fetch_and_store_sre_deployments():
 
             total_processed += 1
 
-        print(f"Successfully ingested {total_processed} production deployments (2024-01-01 onwards) into service_inventory_raw.")
+        print(f"Successfully ingested {total_processed} production deployments into service_inventory_raw.")
         
-        # Export CSV matching Google Sheet format
         export_service_inventory_to_csv(cursor)
 
     except Exception as e:
